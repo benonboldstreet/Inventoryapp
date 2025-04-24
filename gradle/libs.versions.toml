@@ -1,6 +1,6 @@
 [versions]
 agp = "8.9.1"
-kotlin = "2.0.21"
+kotlin = "1.9.22"
 coreKtx = "1.16.0"
 junit = "4.13.2"
 junitVersion = "1.2.1"
@@ -34,6 +34,5 @@ androidx-room-compiler = { group = "androidx.room", name = "room-compiler", vers
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
 kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
-kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 kotlin-kapt = { id = "org.jetbrains.kotlin.kapt", version.ref = "kotlin" }
 

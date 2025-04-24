@@ -1,7 +1,6 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
-    alias(libs.plugins.kotlin.compose)
     id("org.jetbrains.kotlin.kapt")
     // Temporarily disabled for local testing
     // alias(libs.plugins.kotlin.serialization)
@@ -39,6 +38,21 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
+    }
+    
+    composeOptions {
+        kotlinCompilerExtensionVersion = "1.5.8" // Compatible with Kotlin 1.9.22
+    }
+    
+    // Add kapt options to fix annotation processing issues
+    kapt {
+        correctErrorTypes = true
+        useBuildCache = true
+        arguments {
+            arg("room.schemaLocation", "$projectDir/schemas")
+            arg("room.incremental", "true")
+        }
     }
     
     // Add packaging options to resolve conflicts
@@ -95,6 +109,11 @@ dependencies {
     implementation("io.ktor:ktor-serialization-kotlinx-json:2.3.7")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.0")
     implementation("ch.qos.logback:logback-classic:1.4.11")
+    
+    // Add explicit Retrofit dependencies
+    implementation("com.squareup.retrofit2:retrofit:2.9.0")
+    implementation("com.squareup.retrofit2:converter-gson:2.9.0")
+    implementation("com.squareup.okhttp3:logging-interceptor:4.9.0")
     
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
