@@ -28,11 +28,17 @@ class StaffRepository(private val staffDao: StaffDao) {
     
     /**
      * Insert a new staff record
+     * 
+     * [CLOUD ENDPOINT - CREATE] Direct database insertion of staff record
+     * Should be migrated to create staff records in cloud storage via API
      */
     suspend fun insertStaff(staff: Staff) = staffDao.insert(staff)
     
     /**
      * Update an existing staff record
+     * 
+     * [CLOUD ENDPOINT - UPDATE] Direct database update of staff record with timestamp refresh
+     * Should be migrated to update staff records in cloud storage via API
      */
     suspend fun updateStaff(staff: Staff) {
         // Ensure the lastModified timestamp is updated
@@ -42,6 +48,9 @@ class StaffRepository(private val staffDao: StaffDao) {
     
     /**
      * Delete a staff record
+     * 
+     * [CLOUD ENDPOINT - DELETE] Direct database deletion of staff record
+     * Should be migrated to delete staff records in cloud storage via API
      */
     suspend fun deleteStaff(staff: Staff) = staffDao.delete(staff)
 } 

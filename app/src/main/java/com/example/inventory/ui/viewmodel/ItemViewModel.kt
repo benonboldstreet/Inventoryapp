@@ -51,6 +51,9 @@ class ItemViewModel(private val repository: ItemRepository) : ViewModel() {
     
     /**
      * Add a new item
+     * 
+     * [CLOUD ENDPOINT - CREATE] Creates a new inventory item in the database
+     * Should be migrated to create items in cloud storage
      */
     fun addItem(
         name: String,
@@ -77,6 +80,9 @@ class ItemViewModel(private val repository: ItemRepository) : ViewModel() {
     
     /**
      * Update an existing item
+     * 
+     * [CLOUD ENDPOINT - UPDATE] Modifies all properties of an existing inventory item
+     * Should be migrated to update items in cloud storage
      */
     fun updateItem(item: Item) {
         viewModelScope.launch {
@@ -86,6 +92,9 @@ class ItemViewModel(private val repository: ItemRepository) : ViewModel() {
     
     /**
      * Delete an item
+     * 
+     * [CLOUD ENDPOINT - DELETE] Permanently removes an item from the database
+     * Should be migrated to delete items in cloud storage
      */
     fun deleteItem(item: Item) {
         viewModelScope.launch {
@@ -95,6 +104,9 @@ class ItemViewModel(private val repository: ItemRepository) : ViewModel() {
     
     /**
      * Archive an item (mark as inactive) instead of deleting
+     * 
+     * [CLOUD ENDPOINT - UPDATE] Soft-delete by setting isActive=false on an item
+     * Should be migrated to update item status in cloud storage
      */
     fun archiveItem(item: Item) {
         val archivedItem = item.copy(isActive = false, lastModified = System.currentTimeMillis())
@@ -105,6 +117,9 @@ class ItemViewModel(private val repository: ItemRepository) : ViewModel() {
     
     /**
      * Unarchive an item (restore to active)
+     * 
+     * [CLOUD ENDPOINT - UPDATE] Restores a previously archived item by setting isActive=true
+     * Should be migrated to update item status in cloud storage
      */
     fun unarchiveItem(item: Item) {
         val activeItem = item.copy(isActive = true, lastModified = System.currentTimeMillis())
@@ -125,6 +140,9 @@ class ItemViewModel(private val repository: ItemRepository) : ViewModel() {
     
     /**
      * Update item status
+     * 
+     * [CLOUD ENDPOINT - UPDATE] Changes only the status field of an item
+     * Should be migrated to update item status in cloud storage
      */
     fun updateItemStatus(item: Item, newStatus: String) {
         val updatedItem = item.copy(status = newStatus)
@@ -135,6 +153,9 @@ class ItemViewModel(private val repository: ItemRepository) : ViewModel() {
     
     /**
      * Update item condition
+     * 
+     * [CLOUD ENDPOINT - UPDATE] Modifies only the condition field of an item
+     * Should be migrated to update item condition in cloud storage
      */
     fun updateItemCondition(item: Item, newCondition: String) {
         val updatedItem = item.copy(condition = newCondition)

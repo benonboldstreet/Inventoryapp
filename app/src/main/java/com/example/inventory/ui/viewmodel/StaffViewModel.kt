@@ -22,6 +22,9 @@ class StaffViewModel(private val repository: StaffRepository) : ViewModel() {
     
     /**
      * Add a new staff record
+     * 
+     * [CLOUD ENDPOINT - CREATE] Creates a new staff member with name, department, and optional contact details
+     * Should be migrated to create staff records in cloud storage
      */
     fun addStaff(
         name: String, 
@@ -44,6 +47,9 @@ class StaffViewModel(private val repository: StaffRepository) : ViewModel() {
     
     /**
      * Update an existing staff record
+     * 
+     * [CLOUD ENDPOINT - UPDATE] Modifies all properties of an existing staff record
+     * Should be migrated to update staff records in cloud storage
      */
     fun updateStaff(staff: Staff) {
         viewModelScope.launch {
@@ -53,6 +59,9 @@ class StaffViewModel(private val repository: StaffRepository) : ViewModel() {
     
     /**
      * Delete a staff record
+     * 
+     * [CLOUD ENDPOINT - DELETE] Permanently removes a staff record from the database
+     * Should be migrated to delete staff records in cloud storage
      */
     fun deleteStaff(staff: Staff) {
         viewModelScope.launch {
@@ -62,6 +71,9 @@ class StaffViewModel(private val repository: StaffRepository) : ViewModel() {
     
     /**
      * Archive a staff member (mark as inactive) instead of deleting
+     * 
+     * [CLOUD ENDPOINT - UPDATE] Soft-delete by setting isActive=false on a staff record
+     * Should be migrated to update staff status in cloud storage
      */
     fun archiveStaff(staff: Staff) {
         val archivedStaff = staff.copy(isActive = false, lastModified = System.currentTimeMillis())
@@ -77,6 +89,9 @@ class StaffViewModel(private val repository: StaffRepository) : ViewModel() {
     
     /**
      * Update staff department
+     * 
+     * [CLOUD ENDPOINT - UPDATE] Changes only the department field of a staff record
+     * Should be migrated to update staff department in cloud storage
      */
     fun updateStaffDepartment(staff: Staff, newDepartment: String) {
         val updatedStaff = staff.copy(department = newDepartment)
