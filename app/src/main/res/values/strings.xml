@@ -1,3 +1,4 @@
 <resources>
-    <string name="app_name">Inventory</string>
+    <string name="app_name">Inventory Cloud</string>
+    <string name="app_version">v2.0.0 - Cloud Mode</string>
 </resources>
