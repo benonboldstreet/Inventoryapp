@@ -1,166 +1,120 @@
-# Inventory Management App
+# Inventory Cloud (v2.0.0)
 
-An Android mobile application for tracking and managing inventory items with check-in/check-out functionality.
+## Overview
+Inventory Cloud is a cloud-connected version of the original Inventory app. Unlike the original app which used local storage, this version connects to Azure/cloud services for all data operations.
 
-## Features
+## Version Information
+- **Version:** 2.0.0
+- **Mode:** Cloud
+- **Backend:** Azure Cloud Services
+- **Original Repo:** [Local Version](https://github.com/benonboldstreet/Inventoryapp/tree/main)
 
-- **Item Management**: Add, edit, archive, and manage inventory items
-- **Staff Management**: Track staff members who can check out items
-- **Check-in/Check-out System**: Log when items are checked out and returned
-- **Photo Documentation**: Capture photos of items during checkout for condition tracking
-- **Categorization**: Organize items by category with custom category support
-- **Search & Filter**: Find items quickly with search and status filtering
-- **Barcode Scanning**: Scan barcodes to quickly look up or add items
-- **Offline Support**: Use the app without constant internet connection
-- **Archiving**: Archive items and staff instead of deleting them to preserve history
+## Repository Structure
+This repository contains multiple versions of the Inventory application:
 
-## Technical Details
+| Branch | Purpose |
+|--------|---------|
+| `main` | Original local-only implementation with Room database |
+| `cloud-integration-labels` | Original code with cloud endpoint labels (preparation) |
+| `cloud-implementation` | Full cloud implementation (current version) |
 
-- **Platform**: Android (Kotlin)
-- **Architecture**: MVVM with Repository pattern
-- **UI**: Jetpack Compose
-- **Database**: Room database locally, with planned Azure SQL integration
-- **API**: REST API integration (under development)
+## Cloud Architecture Overview
 
-## Required Software & Tools
+### Data Flow
+1. User interacts with the app UI
+2. ViewModels call repository methods
+3. Cloud repositories make API calls to Azure backend
+4. Azure services handle data persistence and business logic
+5. Results are returned to the app for display
 
-### Frontend Development
-- Android Studio (latest version)
-- JDK 11 or newer
-- Kotlin 1.7+
-- Gradle 7.0+
-- Git for version control
+### Key Components
 
-### Backend Development
-- Visual Studio 2022 with .NET 8 SDK
-- SQL Server Management Studio
-- Azure account with subscription
-- Azure Data Studio
-- Postman (for API testing)
+#### API Layer (`app/src/main/java/com/example/inventory/api/`)
+- **NetworkModule**: Central configuration for API services
+- **DTOs**: Data Transfer Objects for API communication
+- **API Services**: Retrofit interfaces defining all cloud endpoints
 
-## Backend Integration
+#### Repository Layer (`app/src/main/java/com/example/inventory/data/repository/`)
+- **CloudItemRepository**: Handles inventory item operations
+- **CloudStaffRepository**: Manages staff member data
+- **CloudCheckoutRepository**: Controls checkout/checkin operations
 
-The app is designed to work with a backend service built on:
-- Azure SQL Database
-- .NET 8 API endpoints 
-- Authentication and synchronization capabilities
+#### Dependency Injection (`app/src/main/java/com/example/inventory/data/AppContainer.kt`)
+- Provides cloud repository implementations to ViewModels
 
-*Note: Backend implementation is in progress by separate team.*
+## Setup Instructions
 
-## Integration Steps
+### 1. Azure Resources Required
+- **Azure App Service**: Hosts the API backend
+- **Azure SQL Database**: Stores inventory data
+- **Azure Blob Storage**: Stores item/checkout photos
+- **Azure Active Directory**: Handles authentication
 
-### Backend Setup
-1. Create Azure SQL Database with these tables:
-   ```sql
-   CREATE TABLE items (
-       id UNIQUEIDENTIFIER PRIMARY KEY,
-       name NVARCHAR(255) NOT NULL,
-       category NVARCHAR(100) NOT NULL,
-       type NVARCHAR(100) NOT NULL,
-       barcode NVARCHAR(100) NOT NULL,
-       condition NVARCHAR(50) NOT NULL,
-       status NVARCHAR(50) NOT NULL,
-       photoPath NVARCHAR(MAX),
-       isActive BIT DEFAULT 1,
-       lastModified BIGINT
-   );
+### 2. Configuration Steps
+1. Set up the required Azure resources above
+2. Update the `BASE_URL` in `NetworkModule.kt` with your Azure endpoint
+3. Add authentication details (update the TODO in NetworkModule)
+4. Configure error handling and monitoring as needed
 
-   CREATE TABLE staff (
-       id UNIQUEIDENTIFIER PRIMARY KEY,
-       name NVARCHAR(255) NOT NULL,
-       department NVARCHAR(100) NOT NULL,
-       email NVARCHAR(255) NOT NULL,
-       phone NVARCHAR(50) NOT NULL,
-       position NVARCHAR(100) NOT NULL,
-       isActive BIT DEFAULT 1,
-       lastModified BIGINT
-   );
+### 3. Cloud API Endpoints
+The app expects the following API endpoints to be available:
 
-   CREATE TABLE checkout_logs (
-       id UNIQUEIDENTIFIER PRIMARY KEY,
-       itemId UNIQUEIDENTIFIER NOT NULL,
-       staffId UNIQUEIDENTIFIER NOT NULL,
-       checkOutTime BIGINT NOT NULL,
-       checkInTime BIGINT,
-       photoPath NVARCHAR(MAX),
-       lastModified BIGINT,
-       FOREIGN KEY (itemId) REFERENCES items(id),
-       FOREIGN KEY (staffId) REFERENCES staff(id)
-   );
-   ```
+#### Item Endpoints
+- `GET api/items` - List all items
+- `GET api/items/{id}` - Get item by ID
+- `GET api/items/barcode/{barcode}` - Get item by barcode
+- `POST api/items` - Create new item
+- `PUT api/items/{id}` - Update existing item
+- `PATCH api/items/{id}/status` - Update item status
+- `PATCH api/items/{id}/archive` - Archive item
+- `PATCH api/items/{id}/unarchive` - Unarchive item
 
-2. Implement these API endpoints in a .NET 8 Web API project:
-   - **Items API**
-     - `GET /api/items` – Get all items
-     - `GET /api/items/{id}` – Get item by ID
-     - `GET /api/items/barcode/{barcode}` – Get item by barcode
-     - `GET /api/items/category/{category}` – Get items by category
-     - `GET /api/items/status/{status}` – Get items by status
-     - `GET /api/items/categories` – Get all unique categories
-     - `POST /api/items` – Add new item
-     - `PUT /api/items/{id}` – Update item
-     - `PATCH /api/items/{id}/status` – Update item status
-     - `PATCH /api/items/{id}/archive` – Archive item
-     - `PATCH /api/items/{id}/unarchive` – Unarchive item
+#### Staff Endpoints
+- `GET api/staff` - List all staff
+- `GET api/staff/{id}` - Get staff by ID
+- `POST api/staff` - Create new staff
+- `PUT api/staff/{id}` - Update existing staff
+- `PATCH api/staff/{id}/archive` - Archive staff
+- `PATCH api/staff/{id}/unarchive` - Unarchive staff
 
-   - **Staff API**
-     - `GET /api/staff` – Get all staff
-     - `GET /api/staff/{id}` – Get staff by ID
-     - `POST /api/staff` – Add new staff
-     - `PUT /api/staff/{id}` – Update staff
-     - `PATCH /api/staff/{id}/archive` – Archive staff
-     - `PATCH /api/staff/{id}/unarchive` – Unarchive staff
+#### Checkout Endpoints
+- `GET api/checkoutlogs` - List all checkout logs
+- `GET api/checkoutlogs/item/{itemId}` - Get checkouts by item
+- `GET api/checkoutlogs/staff/{staffId}` - Get checkouts by staff
+- `GET api/checkoutlogs/current` - Get current checkouts
+- `POST api/checkoutlogs` - Create checkout
+- `PATCH api/checkoutlogs/{id}/checkin` - Check in item
 
-   - **Checkout Logs API**
-     - `GET /api/checkoutlogs` – Get all checkout logs
-     - `GET /api/checkoutlogs/{id}` – Get log by ID
-     - `GET /api/checkoutlogs/item/{itemId}` – Get logs by item ID
-     - `GET /api/checkoutlogs/staff/{staffId}` – Get logs by staff ID
-     - `GET /api/checkoutlogs/current` – Get all active checkouts
-     - `POST /api/checkoutlogs` – Create new checkout
-     - `PATCH /api/checkoutlogs/{id}/checkin` – Check in an item
+## Key Differences from Local Version
 
-3. Set up authentication and user management (optional for first phase)
+1. **Storage**:
+   - Local: Room database on device
+   - Cloud: Azure SQL Database + Blob Storage
 
-4. Deploy the API to Azure App Service and provide the API URL to the frontend developer
+2. **Data Access**:
+   - Local: Synchronous database operations
+   - Cloud: Asynchronous API calls with error handling
 
-### Frontend Integration
-1. Update network configuration in `NetworkModule.kt` with API URL
-2. Implement API service interfaces
-3. Modify repositories to use network services
-4. Add offline synchronization
-5. Test with backend services
+3. **Authentication**:
+   - Local: None
+   - Cloud: Azure AD integration (to be implemented)
 
-## Installation
+4. **Offline Operation**:
+   - Local: Full functionality offline
+   - Cloud: Limited functionality, requires network connection
 
-1. Clone the repository
-2. Open the project in Android Studio
-3. Sync Gradle files
-4. Run on emulator or physical device
+## Implementation Notes
 
-## Setup for Development
+### Error Handling
+- All cloud operations include try/catch blocks
+- Empty results returned on network failure
+- TODO markers indicate where proper error handling should be implemented
 
-### Prerequisites
-- Android Studio Arctic Fox or newer
-- Android SDK 21+
-- Gradle 7.0+
+### Future Improvements
+- Implement offline caching with sync
+- Add user authentication
+- Add network status indicators in UI
+- Implement retry mechanisms for failed operations
 
-### Build Instructions
-```
-./gradlew assembleDebug
-```
-
-## Screenshots
-
-[Screenshots to be added]
-
-## Future Enhancements
-
-- Multi-device synchronization 
-- Advanced reporting and analytics
-- QR code generation for items
-- Automated notifications for overdue items
-
-## License
-
-[License to be determined] 
+## Contact Information
+For questions or support, please contact [Your contact information] 
