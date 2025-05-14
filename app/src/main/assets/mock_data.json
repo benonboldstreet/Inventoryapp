@@ -1,0 +1,39 @@
+{
+  "items": [
+    {
+      "id": "1",
+      "name": "Laptop",
+      "quantity": 10,
+      "category": "Electronics",
+      "lastUpdated": "2023-08-15T10:30:00Z"
+    },
+    {
+      "id": "2",
+      "name": "Desk Chair",
+      "quantity": 5,
+      "category": "Furniture",
+      "lastUpdated": "2023-08-14T14:45:00Z"
+    },
+    {
+      "id": "3",
+      "name": "Wireless Mouse",
+      "quantity": 15,
+      "category": "Electronics",
+      "lastUpdated": "2023-08-16T09:15:00Z"
+    },
+    {
+      "id": "4",
+      "name": "Whiteboard",
+      "quantity": 3,
+      "category": "Office Supplies",
+      "lastUpdated": "2023-08-12T11:20:00Z"
+    },
+    {
+      "id": "5",
+      "name": "USB Drive",
+      "quantity": 25,
+      "category": "Electronics",
+      "lastUpdated": "2023-08-10T16:30:00Z"
+    }
+  ]
+} 
