@@ -117,4 +117,4 @@ The app expects the following API endpoints to be available:
 - Implement retry mechanisms for failed operations
 
 ## Contact Information
-For questions or support, please contact me located on Mobile of email at work  
+For questions or support, please contact me located on me mobile   
