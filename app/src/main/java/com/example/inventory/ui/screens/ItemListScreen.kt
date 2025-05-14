@@ -416,6 +416,25 @@ fun AddItemDialog(
                 )
                 
                 Spacer(modifier = Modifier.height(16.dp))
+
+                // Barcode with scanner button
+                OutlinedTextField(
+                    value = barcode,
+                    onValueChange = { barcode = it },
+                    label = { Text("Barcode *") },
+                    placeholder = { Text("Scan or enter barcode") },
+                    trailingIcon = {
+                        IconButton(onClick = onScanBarcode) {
+                            Icon(
+                                imageVector = Icons.Default.QrCodeScanner,
+                                contentDescription = "Scan Barcode"
+                            )
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
                 
                 // Category dropdown
                 Column {
@@ -514,25 +533,6 @@ fun AddItemDialog(
                     onValueChange = { type = it },
                     label = { Text("Brand/Manufacturer *") },
                     placeholder = { Text("e.g., Dell, Apple, Lenovo") },
-                    modifier = Modifier.fillMaxWidth()
-                )
-                
-                Spacer(modifier = Modifier.height(8.dp))
-                
-                // Barcode with scanner button
-                OutlinedTextField(
-                    value = barcode,
-                    onValueChange = { barcode = it },
-                    label = { Text("Barcode *") },
-                    placeholder = { Text("Scan or enter barcode") },
-                    trailingIcon = {
-                        IconButton(onClick = onScanBarcode) {
-                            Icon(
-                                imageVector = Icons.Default.QrCodeScanner,
-                                contentDescription = "Scan Barcode"
-                            )
-                        }
-                    },
                     modifier = Modifier.fillMaxWidth()
                 )
                 
