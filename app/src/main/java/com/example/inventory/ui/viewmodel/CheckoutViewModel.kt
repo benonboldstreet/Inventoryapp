@@ -35,6 +35,10 @@ class CheckoutViewModel(
     
     /**
      * Check out an item to a staff member
+     * 
+     * [CLOUD ENDPOINT - CREATE/UPDATE] Creates checkout record AND updates item status to "Checked Out"
+     * Should be migrated to create checkout records and update items in cloud storage
+     * This requires a transaction or coordination between two cloud operations
      */
     fun checkOutItem(itemId: UUID, staffId: UUID) {
         viewModelScope.launch {
@@ -57,6 +61,10 @@ class CheckoutViewModel(
     
     /**
      * Check out an item with a photo
+     * 
+     * [CLOUD ENDPOINT - CREATE/UPDATE] Creates checkout record with photo AND updates item status
+     * Should be migrated to create checkout records with photo storage and update items in cloud
+     * This requires a transaction or coordination between two cloud operations plus blob storage
      */
     fun checkOutItemWithPhoto(itemId: UUID, staffId: UUID, photoPath: String) {
         viewModelScope.launch {
@@ -87,6 +95,10 @@ class CheckoutViewModel(
     
     /**
      * Check in an item
+     * 
+     * [CLOUD ENDPOINT - UPDATE] Sets checkInTime and updates item status back to "Available"
+     * Should be migrated to update checkout records and items in cloud storage
+     * This requires a transaction or coordination between two cloud operations
      */
     fun checkInItem(checkoutLogId: UUID) {
         viewModelScope.launch {
@@ -124,6 +136,9 @@ class CheckoutViewModel(
     
     /**
      * Delete a checkout log
+     * 
+     * [CLOUD ENDPOINT - DELETE] Permanently removes a checkout record from the database
+     * Should be migrated to delete checkout records in cloud storage
      */
     fun deleteCheckoutLog(checkoutLog: CheckoutLog) {
         viewModelScope.launch {

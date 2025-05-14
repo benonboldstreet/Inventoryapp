@@ -47,11 +47,17 @@ class ItemRepository(private val itemDao: ItemDao) {
     
     /**
      * Insert a new item
+     * 
+     * [CLOUD ENDPOINT - CREATE] Direct database insertion of item
+     * Should be migrated to create items in cloud storage via API
      */
     suspend fun insertItem(item: Item) = itemDao.insert(item)
     
     /**
      * Update an existing item
+     * 
+     * [CLOUD ENDPOINT - UPDATE] Direct database update of item with timestamp refresh
+     * Should be migrated to update items in cloud storage via API
      */
     suspend fun updateItem(item: Item) {
         // Ensure the lastModified timestamp is updated
@@ -61,6 +67,9 @@ class ItemRepository(private val itemDao: ItemDao) {
     
     /**
      * Delete an item
+     * 
+     * [CLOUD ENDPOINT - DELETE] Direct database deletion of item
+     * Should be migrated to delete items in cloud storage via API
      */
     suspend fun deleteItem(item: Item) = itemDao.delete(item)
 } 

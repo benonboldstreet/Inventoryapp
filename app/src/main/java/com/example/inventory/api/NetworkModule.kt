@@ -81,7 +81,8 @@ fun Item.toDto(): ItemDto = ItemDto(
 )
 
 /**
- * Retrofit API service interfaces
+ * Retrofit API service interfaces for cloud connectivity
+ * These services map directly to Azure/cloud endpoints
  */
 interface ItemApiService {
     @GET("api/items")
@@ -150,18 +151,20 @@ interface CheckoutApiService {
 }
 
 /**
- * Network module for creating API services
+ * Network module for creating API services to connect to cloud/Azure backend
  */
 object NetworkModule {
     private const val CONNECTION_TIMEOUT = 30L
     
-    // Replace this with your actual API base URL
+    // CLOUD ENDPOINT: Azure API base URL
+    // TODO: Replace this with the actual Azure API URL when available
     private const val BASE_URL = "https://your-azure-api.azurewebsites.net/"
     
     private val gson: Gson = GsonBuilder()
         .setLenient()
         .create()
     
+    // Configure the HTTP client with appropriate timeouts and logging for cloud connectivity
     private val httpClient = OkHttpClient.Builder()
         .connectTimeout(CONNECTION_TIMEOUT, TimeUnit.SECONDS)
         .readTimeout(CONNECTION_TIMEOUT, TimeUnit.SECONDS)
@@ -173,6 +176,7 @@ object NetworkModule {
                 HttpLoggingInterceptor.Level.NONE
             }
         })
+        // TODO: Add authentication interceptor for Azure/cloud authentication
         .build()
     
     private val retrofit = Retrofit.Builder()
@@ -181,7 +185,7 @@ object NetworkModule {
         .addConverterFactory(GsonConverterFactory.create(gson))
         .build()
     
-    // Create API service instances
+    // Create API service instances for cloud connectivity
     val itemApiService: ItemApiService = retrofit.create(ItemApiService::class.java)
     val staffApiService: StaffApiService = retrofit.create(StaffApiService::class.java)
     val checkoutApiService: CheckoutApiService = retrofit.create(CheckoutApiService::class.java)

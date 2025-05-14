@@ -45,11 +45,17 @@ class CheckoutRepository(private val checkoutLogDao: CheckoutLogDao) {
     
     /**
      * Insert a new checkout log
+     * 
+     * [CLOUD ENDPOINT - CREATE] Direct database insertion of checkout log
+     * Should be migrated to create checkout records in cloud storage via API
      */
     suspend fun insertCheckoutLog(checkoutLog: CheckoutLog) = checkoutLogDao.insert(checkoutLog)
     
     /**
      * Update an existing checkout log
+     * 
+     * [CLOUD ENDPOINT - UPDATE] Direct database update of checkout log with timestamp refresh
+     * Should be migrated to update checkout records in cloud storage via API
      */
     suspend fun updateCheckoutLog(checkoutLog: CheckoutLog) {
         // Ensure the lastModified timestamp is updated
@@ -59,11 +65,17 @@ class CheckoutRepository(private val checkoutLogDao: CheckoutLogDao) {
     
     /**
      * Delete a checkout log
+     * 
+     * [CLOUD ENDPOINT - DELETE] Direct database deletion of checkout log
+     * Should be migrated to delete checkout records in cloud storage via API
      */
     suspend fun deleteCheckoutLog(checkoutLog: CheckoutLog) = checkoutLogDao.delete(checkoutLog)
     
     /**
      * Check out an item to a staff member
+     * 
+     * [CLOUD ENDPOINT - CREATE] Creates checkout record with current timestamp
+     * Should be migrated to create checkout records in cloud storage via API
      */
     suspend fun checkOutItem(itemId: UUID, staffId: UUID): CheckoutLog {
         val checkoutLog = CheckoutLog(
@@ -79,6 +91,10 @@ class CheckoutRepository(private val checkoutLogDao: CheckoutLogDao) {
     
     /**
      * Check out an item with a photo
+     * 
+     * [CLOUD ENDPOINT - CREATE] Creates checkout record with photo path
+     * Should be migrated to create checkout records in cloud storage via API
+     * The photo should be stored in cloud blob storage with secure access
      */
     suspend fun checkOutItemWithPhoto(itemId: UUID, staffId: UUID, photoPath: String): CheckoutLog {
         val checkoutLog = CheckoutLog(
@@ -95,6 +111,9 @@ class CheckoutRepository(private val checkoutLogDao: CheckoutLogDao) {
     
     /**
      * Check in an item
+     * 
+     * [CLOUD ENDPOINT - UPDATE] Updates existing checkout record with check-in time
+     * Should be migrated to update checkout records in cloud storage via API
      */
     suspend fun checkInItem(checkoutLog: CheckoutLog): CheckoutLog {
         val updatedLog = checkoutLog.copy(

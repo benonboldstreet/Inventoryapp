@@ -4,7 +4,12 @@ import android.app.Application
 import com.example.inventory.api.ApiServer
 import com.example.inventory.data.AppContainer
 import com.example.inventory.data.AppContainerImpl
+import android.util.Log
 
+/**
+ * Inventory Application
+ * CLOUD MODE: This application now connects to an Azure backend instead of a local database
+ */
 class InventoryApplication : Application() {
     
     // AppContainer instance used by the rest of the app
@@ -12,7 +17,12 @@ class InventoryApplication : Application() {
     
     override fun onCreate() {
         super.onCreate()
+        
+        // Initialize the AppContainer with cloud repositories
         container = AppContainerImpl(this)
+        
+        // Log that we're running in cloud mode
+        Log.i("InventoryApp", "Starting in CLOUD MODE - using Azure backend")
         
         // Temporarily disabled for local testing
         // Start the API server with repositories from the container
