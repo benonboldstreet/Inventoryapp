@@ -116,5 +116,15 @@ The app expects the following API endpoints to be available:
 - Add network status indicators in UI
 - Implement retry mechanisms for failed operations
 
+## Mock Database Implementation
+
+We've implemented a JSON-based mock database for testing cloud features:
+
+- [Mock JSON Data](app/src/main/assets/mock_data.json) - Sample inventory items
+- [Repository Interface](app/src/main/java/com/inventory/data/Repository.kt) - Data operations contract
+- [Mock Repository Implementation](app/src/main/java/com/inventory/data/MockRepository.kt) - JSON-based implementation
+- [Item Model](app/src/main/java/com/inventory/model/Item.kt) - Data model for inventory items
+- [Database Guide](DATABASE_GUIDE.md) - Documentation on using the mock database
+
 ## Contact Information
 For questions or support, please contact me located on me mobile   
