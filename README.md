@@ -118,7 +118,7 @@ The app expects the following API endpoints to be available:
 
 ## Mock Database Implementation
 
-We've implemented a JSON-based mock database for testing cloud features:
+I just implemented a JSON-based mock database for testing cloud features Was a fun @:
 
 - [Mock JSON Data](app/src/main/assets/mock_data.json) - Sample inventory items
 - [Repository Interface](app/src/main/java/com/inventory/data/Repository.kt) - Data operations contract
