@@ -1,56 +1,43 @@
 package com.example.inventory.data.repository
 
-import com.example.inventory.data.database.Staff
-import com.example.inventory.data.database.StaffDao
+import com.example.inventory.data.model.Staff
 import kotlinx.coroutines.flow.Flow
 import java.util.UUID
 
 /**
- * Repository for managing Staff data operations
+ * Repository interface for managing Staff data operations
+ * 
+ * This defines the contract for staff repository implementations,
+ * whether they're using local storage or cloud storage.
  */
-class StaffRepository(private val staffDao: StaffDao) {
-    
+interface StaffRepository {
     /**
      * Get all staff as a Flow
      */
-    fun getAllStaff(): Flow<List<Staff>> = staffDao.getAllStaff()
+    fun getAllStaff(): Flow<List<Staff>>
     
     /**
      * Get staff by department as a Flow
      */
-    fun getStaffByDepartment(department: String): Flow<List<Staff>> = 
-        staffDao.getStaffByDepartment(department)
+    fun getStaffByDepartment(department: String): Flow<List<Staff>>
     
     /**
      * Get staff by ID
      */
-    suspend fun getStaffById(id: UUID): Staff? = staffDao.getStaffById(id)
+    suspend fun getStaffById(id: UUID): Staff?
     
     /**
      * Insert a new staff record
-     * 
-     * [CLOUD ENDPOINT - CREATE] Direct database insertion of staff record
-     * Should be migrated to create staff records in cloud storage via API
      */
-    suspend fun insertStaff(staff: Staff) = staffDao.insert(staff)
+    suspend fun insertStaff(staff: Staff)
     
     /**
      * Update an existing staff record
-     * 
-     * [CLOUD ENDPOINT - UPDATE] Direct database update of staff record with timestamp refresh
-     * Should be migrated to update staff records in cloud storage via API
      */
-    suspend fun updateStaff(staff: Staff) {
-        // Ensure the lastModified timestamp is updated
-        val updatedStaff = staff.copy(lastModified = System.currentTimeMillis())
-        staffDao.update(updatedStaff)
-    }
+    suspend fun updateStaff(staff: Staff)
     
     /**
      * Delete a staff record
-     * 
-     * [CLOUD ENDPOINT - DELETE] Direct database deletion of staff record
-     * Should be migrated to delete staff records in cloud storage via API
      */
-    suspend fun deleteStaff(staff: Staff) = staffDao.delete(staff)
+    suspend fun deleteStaff(staff: Staff)
 } 

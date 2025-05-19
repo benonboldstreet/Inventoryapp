@@ -1,39 +1,316 @@
 {
   "items": [
     {
-      "id": "1",
-      "name": "Laptop",
-      "quantity": 10,
-      "category": "Electronics",
-      "lastUpdated": "2023-08-15T10:30:00Z"
+      "id": "550e8400-e29b-41d4-a716-446655440000",
+      "name": "ThinkPad X1 Carbon",
+      "category": "Laptops",
+      "type": "Computer Equipment",
+      "barcode": "4567890123456",
+      "condition": "Good",
+      "status": "Available",
+      "photoPath": "items/thinkpad_x1.jpg",
+      "isActive": true,
+      "lastModified": 1692115200000
     },
     {
-      "id": "2",
-      "name": "Desk Chair",
-      "quantity": 5,
-      "category": "Furniture",
-      "lastUpdated": "2023-08-14T14:45:00Z"
+      "id": "550e8400-e29b-41d4-a716-446655440001",
+      "name": "Dell Ultrasharp Monitor",
+      "category": "Monitors",
+      "type": "Computer Equipment",
+      "barcode": "7891234567890",
+      "condition": "Excellent",
+      "status": "Available",
+      "photoPath": "items/dell_monitor.jpg",
+      "isActive": true,
+      "lastModified": 1692115200000
     },
     {
-      "id": "3",
-      "name": "Wireless Mouse",
-      "quantity": 15,
-      "category": "Electronics",
-      "lastUpdated": "2023-08-16T09:15:00Z"
+      "id": "550e8400-e29b-41d4-a716-446655440002",
+      "name": "Logitech MX Master Mouse",
+      "category": "Peripherals",
+      "type": "Computer Equipment",
+      "barcode": "1234567890123",
+      "condition": "Good",
+      "status": "Available",
+      "photoPath": "items/logitech_mouse.jpg",
+      "isActive": true,
+      "lastModified": 1692115200000
     },
     {
-      "id": "4",
-      "name": "Whiteboard",
-      "quantity": 3,
-      "category": "Office Supplies",
-      "lastUpdated": "2023-08-12T11:20:00Z"
+      "id": "550e8400-e29b-41d4-a716-446655440003",
+      "name": "Apple iPad Pro",
+      "category": "Tablets",
+      "type": "Mobile Devices",
+      "barcode": "2345678901234",
+      "condition": "Excellent",
+      "status": "Checked Out",
+      "photoPath": "items/ipad_pro.jpg",
+      "isActive": true,
+      "lastModified": 1692115200000
     },
     {
-      "id": "5",
-      "name": "USB Drive",
-      "quantity": 25,
-      "category": "Electronics",
-      "lastUpdated": "2023-08-10T16:30:00Z"
+      "id": "550e8400-e29b-41d4-a716-446655440004",
+      "name": "Sony WH-1000XM4 Headphones",
+      "category": "Audio",
+      "type": "Accessories",
+      "barcode": "3456789012345",
+      "condition": "Good",
+      "status": "Available",
+      "photoPath": "items/sony_headphones.jpg",
+      "isActive": true,
+      "lastModified": 1692115200000
+    },
+    {
+      "id": "550e8400-e29b-41d4-a716-446655440005",
+      "name": "MacBook Pro M2",
+      "category": "Laptops",
+      "type": "Computer Equipment",
+      "barcode": "4567890123457",
+      "condition": "Excellent",
+      "status": "Maintenance",
+      "photoPath": "items/macbook_pro.jpg",
+      "isActive": true,
+      "lastModified": 1692115200000
+    },
+    {
+      "id": "550e8400-e29b-41d4-a716-446655440006",
+      "name": "Samsung Galaxy Tab S9",
+      "category": "Tablets",
+      "type": "Mobile Devices",
+      "barcode": "5678901234567",
+      "condition": "Fair",
+      "status": "Lost",
+      "photoPath": "items/galaxy_tab.jpg",
+      "isActive": true,
+      "lastModified": 1692115200000
+    },
+    {
+      "id": "550e8400-e29b-41d4-a716-446655440007",
+      "name": "Microsoft Surface Pro",
+      "category": "Tablets",
+      "type": "Computer Equipment",
+      "barcode": "6789012345678",
+      "condition": "Good",
+      "status": "Available",
+      "photoPath": "items/surface_pro.jpg",
+      "isActive": true,
+      "lastModified": 1692115200000
+    },
+    {
+      "id": "550e8400-e29b-41d4-a716-446655440008",
+      "name": "Canon EOS R5",
+      "category": "Cameras",
+      "type": "Photography",
+      "barcode": "7890123456789",
+      "condition": "Excellent",
+      "status": "Available",
+      "photoPath": "items/canon_r5.jpg",
+      "isActive": true,
+      "lastModified": 1692115200000
+    },
+    {
+      "id": "550e8400-e29b-41d4-a716-446655440009",
+      "name": "DJI Mavic 3 Pro",
+      "category": "Drones",
+      "type": "Photography",
+      "barcode": "8901234567890",
+      "condition": "Good",
+      "status": "Available",
+      "photoPath": "items/dji_mavic.jpg",
+      "isActive": true,
+      "lastModified": 1692115200000
+    },
+    {
+      "id": "550e8400-e29b-41d4-a716-446655440010",
+      "name": "HP LaserJet Pro",
+      "category": "Printers",
+      "type": "Office Equipment",
+      "barcode": "9012345678901",
+      "condition": "Poor",
+      "status": "Maintenance",
+      "photoPath": "items/hp_printer.jpg",
+      "isActive": true,
+      "lastModified": 1692115200000,
+      "maintenanceHistory": [
+        {
+          "date": 1690300800000,
+          "description": "Toner replacement",
+          "performedBy": "650e8400-e29b-41d4-a716-446655440005"
+        },
+        {
+          "date": 1691510400000,
+          "description": "Paper jam repair",
+          "performedBy": "650e8400-e29b-41d4-a716-446655440001"
+        }
+      ]
+    },
+    {
+      "id": "550e8400-e29b-41d4-a716-446655440011",
+      "name": "Microsoft Surface Studio",
+      "category": "Monitors",
+      "type": "Computer Equipment",
+      "barcode": "0123456789012",
+      "condition": "Excellent",
+      "status": "Available",
+      "photoPath": "items/surface_studio.jpg",
+      "isActive": true,
+      "lastModified": 1692115200000
+    }
+  ],
+  "staff": [
+    {
+      "id": "650e8400-e29b-41d4-a716-446655440001",
+      "name": "John Smith",
+      "department": "IT",
+      "email": "john.smith@example.com",
+      "phone": "555-1234",
+      "position": "Support Specialist",
+      "isActive": true,
+      "lastModified": 1692115200000
+    },
+    {
+      "id": "650e8400-e29b-41d4-a716-446655440002",
+      "name": "Emily Johnson",
+      "department": "Engineering",
+      "email": "emily.johnson@example.com",
+      "phone": "555-2345",
+      "position": "Software Engineer",
+      "isActive": true,
+      "lastModified": 1692115200000
+    },
+    {
+      "id": "650e8400-e29b-41d4-a716-446655440003",
+      "name": "Michael Williams",
+      "department": "Finance",
+      "email": "michael.williams@example.com",
+      "phone": "555-3456",
+      "position": "Financial Analyst",
+      "isActive": true,
+      "lastModified": 1692115200000
+    },
+    {
+      "id": "650e8400-e29b-41d4-a716-446655440004",
+      "name": "Sarah Davis",
+      "department": "Marketing",
+      "email": "sarah.davis@example.com",
+      "phone": "555-4567",
+      "position": "Marketing Manager",
+      "isActive": true,
+      "lastModified": 1692115200000
+    },
+    {
+      "id": "650e8400-e29b-41d4-a716-446655440005",
+      "name": "David Wilson",
+      "department": "IT",
+      "email": "david.wilson@example.com",
+      "phone": "555-5678",
+      "position": "System Administrator",
+      "isActive": true,
+      "lastModified": 1692115200000
+    },
+    {
+      "id": "650e8400-e29b-41d4-a716-446655440006",
+      "name": "Lisa Anderson",
+      "department": "Engineering",
+      "email": "lisa.anderson@example.com",
+      "phone": "555-6789",
+      "position": "Senior Developer",
+      "isActive": true,
+      "lastModified": 1692115200000
+    },
+    {
+      "id": "650e8400-e29b-41d4-a716-446655440007",
+      "name": "Robert Taylor",
+      "department": "IT",
+      "email": "robert.taylor@example.com",
+      "phone": "555-7890",
+      "position": "IT Manager",
+      "isActive": false,
+      "lastModified": 1692115200000
+    },
+    {
+      "id": "650e8400-e29b-41d4-a716-446655440008",
+      "name": "James Brown",
+      "department": "IT",
+      "email": "james.brown@example.com",
+      "phone": "555-8901",
+      "position": "Hardware Technician",
+      "isActive": true,
+      "lastModified": 1692115200000
+    }
+  ],
+  "checkoutLogs": [
+    {
+      "id": "750e8400-e29b-41d4-a716-446655440001",
+      "itemId": "550e8400-e29b-41d4-a716-446655440003",
+      "staffId": "650e8400-e29b-41d4-a716-446655440001",
+      "checkOutTime": 1692115200000,
+      "checkInTime": null,
+      "photoPath": "checkouts/ipad_checkout.jpg",
+      "lastModified": 1692115200000
+    },
+    {
+      "id": "750e8400-e29b-41d4-a716-446655440002",
+      "itemId": "550e8400-e29b-41d4-a716-446655440001",
+      "staffId": "650e8400-e29b-41d4-a716-446655440002",
+      "checkOutTime": 1690300800000,
+      "checkInTime": 1691510400000,
+      "photoPath": "checkouts/monitor_checkout.jpg",
+      "lastModified": 1691510400000
+    },
+    {
+      "id": "750e8400-e29b-41d4-a716-446655440003",
+      "itemId": "550e8400-e29b-41d4-a716-446655440005",
+      "staffId": "650e8400-e29b-41d4-a716-446655440005",
+      "checkOutTime": 1690300800000,
+      "checkInTime": 1691510400000,
+      "photoPath": "checkouts/macbook_checkout.jpg",
+      "lastModified": 1691510400000
+    },
+    {
+      "id": "750e8400-e29b-41d4-a716-446655440004",
+      "itemId": "550e8400-e29b-41d4-a716-446655440008",
+      "staffId": "650e8400-e29b-41d4-a716-446655440004",
+      "checkOutTime": 1692115200000,
+      "checkInTime": null,
+      "photoPath": "checkouts/camera_checkout.jpg",
+      "lastModified": 1692115200000
+    },
+    {
+      "id": "750e8400-e29b-41d4-a716-446655440005",
+      "itemId": "550e8400-e29b-41d4-a716-446655440009",
+      "staffId": "650e8400-e29b-41d4-a716-446655440006",
+      "checkOutTime": 1692115200000,
+      "checkInTime": null,
+      "photoPath": "checkouts/drone_checkout.jpg",
+      "lastModified": 1692115200000
+    },
+    {
+      "id": "750e8400-e29b-41d4-a716-446655440006",
+      "itemId": "550e8400-e29b-41d4-a716-446655440011",
+      "staffId": "650e8400-e29b-41d4-a716-446655440002",
+      "checkOutTime": 1680300800000,
+      "checkInTime": 1681510400000,
+      "photoPath": "checkouts/surface_studio_checkout1.jpg",
+      "lastModified": 1681510400000
+    },
+    {
+      "id": "750e8400-e29b-41d4-a716-446655440007",
+      "itemId": "550e8400-e29b-41d4-a716-446655440011",
+      "staffId": "650e8400-e29b-41d4-a716-446655440006",
+      "checkOutTime": 1682115200000,
+      "checkInTime": 1682201600000,
+      "photoPath": "checkouts/surface_studio_checkout2.jpg",
+      "lastModified": 1682201600000
+    },
+    {
+      "id": "750e8400-e29b-41d4-a716-446655440008",
+      "itemId": "550e8400-e29b-41d4-a716-446655440011",
+      "staffId": "650e8400-e29b-41d4-a716-446655440004",
+      "checkOutTime": 1682201600000,
+      "checkInTime": null,
+      "photoPath": "checkouts/surface_studio_checkout3.jpg",
+      "lastModified": 1682201600000
     }
   ]
 } 

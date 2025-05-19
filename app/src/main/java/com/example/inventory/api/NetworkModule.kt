@@ -1,12 +1,17 @@
 package com.example.inventory.api
 
+import android.content.Context
+import android.util.Log
 import com.example.inventory.BuildConfig
-import com.example.inventory.data.database.Item
-import com.example.inventory.data.database.Staff
-import com.example.inventory.data.database.CheckoutLog
+import com.example.inventory.data.model.Item
+import com.example.inventory.data.model.Staff
+import com.example.inventory.data.model.CheckoutLog
 import com.google.gson.Gson
 import com.google.gson.GsonBuilder
+import kotlinx.coroutines.runBlocking
+import okhttp3.Interceptor
 import okhttp3.OkHttpClient
+import okhttp3.Response
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
@@ -77,6 +82,48 @@ fun Item.toDto(): ItemDto = ItemDto(
     status = status,
     photoPath = photoPath,
     isActive = isActive,
+    lastModified = lastModified
+)
+
+fun StaffDto.toEntity(): Staff = Staff(
+    id = id?.let { UUID.fromString(it) } ?: UUID.randomUUID(),
+    name = name,
+    department = department,
+    email = email,
+    phone = phone,
+    position = position,
+    isActive = isActive,
+    lastModified = lastModified
+)
+
+fun Staff.toDto(): StaffDto = StaffDto(
+    id = id.toString(),
+    name = name,
+    department = department,
+    email = email,
+    phone = phone,
+    position = position,
+    isActive = isActive,
+    lastModified = lastModified
+)
+
+fun CheckoutLogDto.toEntity(): CheckoutLog = CheckoutLog(
+    id = id?.let { UUID.fromString(it) } ?: UUID.randomUUID(),
+    itemId = UUID.fromString(itemId),
+    staffId = UUID.fromString(staffId),
+    checkOutTime = checkOutTime ?: System.currentTimeMillis(),
+    checkInTime = checkInTime,
+    photoPath = photoPath,
+    lastModified = lastModified
+)
+
+fun CheckoutLog.toDto(): CheckoutLogDto = CheckoutLogDto(
+    id = id.toString(),
+    itemId = itemId.toString(),
+    staffId = staffId.toString(),
+    checkOutTime = checkOutTime,
+    checkInTime = checkInTime,
+    photoPath = photoPath,
     lastModified = lastModified
 )
 
@@ -160,12 +207,18 @@ object NetworkModule {
     // TODO: Replace this with the actual Azure API URL when available
     private const val BASE_URL = "https://your-azure-api.azurewebsites.net/"
     
+    // Flag to use mock services for testing
+    private var useMockServices = true
+    
+    // Mock service instance
+    private var mockApiService: MockApiService? = null
+    
     private val gson: Gson = GsonBuilder()
         .setLenient()
         .create()
     
     // Configure the HTTP client with appropriate timeouts and logging for cloud connectivity
-    private val httpClient = OkHttpClient.Builder()
+    private var httpClient = OkHttpClient.Builder()
         .connectTimeout(CONNECTION_TIMEOUT, TimeUnit.SECONDS)
         .readTimeout(CONNECTION_TIMEOUT, TimeUnit.SECONDS)
         .writeTimeout(CONNECTION_TIMEOUT, TimeUnit.SECONDS)
@@ -176,17 +229,90 @@ object NetworkModule {
                 HttpLoggingInterceptor.Level.NONE
             }
         })
-        // TODO: Add authentication interceptor for Azure/cloud authentication
         .build()
     
-    private val retrofit = Retrofit.Builder()
+    private var retrofit = Retrofit.Builder()
         .baseUrl(BASE_URL)
         .client(httpClient)
         .addConverterFactory(GsonConverterFactory.create(gson))
         .build()
     
     // Create API service instances for cloud connectivity
-    val itemApiService: ItemApiService = retrofit.create(ItemApiService::class.java)
-    val staffApiService: StaffApiService = retrofit.create(StaffApiService::class.java)
-    val checkoutApiService: CheckoutApiService = retrofit.create(CheckoutApiService::class.java)
+    @Volatile
+    private var _itemApiService: ItemApiService = retrofit.create(ItemApiService::class.java)
+    
+    @Volatile
+    private var _staffApiService: StaffApiService = retrofit.create(StaffApiService::class.java)
+    
+    @Volatile
+    private var _checkoutApiService: CheckoutApiService = retrofit.create(CheckoutApiService::class.java)
+    
+    // Public access to API services
+    val itemApiService: ItemApiService
+        get() = _itemApiService
+    
+    val staffApiService: StaffApiService
+        get() = _staffApiService
+    
+    val checkoutApiService: CheckoutApiService
+        get() = _checkoutApiService
+    
+    /**
+     * Initialize with mock services for testing
+     */
+    fun initWithMockServices(context: Context) {
+        if (mockApiService == null) {
+            mockApiService = MockApiService(context)
+        }
+        
+        // Use mock services
+        _itemApiService = mockApiService!!.createMockItemApiService()
+        _staffApiService = mockApiService!!.createMockStaffApiService()
+        _checkoutApiService = mockApiService!!.createMockCheckoutApiService()
+        
+        useMockServices = true
+        
+        Log.d("NetworkModule", "Initialized with mock services for testing")
+    }
+    
+    /**
+     * Switch to real cloud services
+     */
+    fun useRealServices() {
+        _itemApiService = retrofit.create(ItemApiService::class.java)
+        _staffApiService = retrofit.create(StaffApiService::class.java)
+        _checkoutApiService = retrofit.create(CheckoutApiService::class.java)
+        
+        useMockServices = false
+        
+        Log.d("NetworkModule", "Switched to real cloud services")
+    }
+    
+    /**
+     * Check if using mock services
+     */
+    fun isUsingMockServices(): Boolean {
+        return useMockServices
+    }
+    
+    /**
+     * Get the mock service for test configuration
+     */
+    fun getMockService(): MockApiService? {
+        return mockApiService
+    }
+    
+    /**
+     * Replace the existing services with the provided ones
+     * This is used by AuthNetworkModule to replace services with authenticated ones
+     */
+    internal fun replaceServices(
+        itemApiService: ItemApiService,
+        staffApiService: StaffApiService,
+        checkoutApiService: CheckoutApiService
+    ) {
+        _itemApiService = itemApiService
+        _staffApiService = staffApiService
+        _checkoutApiService = checkoutApiService
+    }
 } 

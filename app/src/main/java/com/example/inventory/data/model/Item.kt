@@ -1,17 +1,13 @@
-package com.example.inventory.data.database
+package com.example.inventory.data.model
 
-import androidx.room.Entity
-import androidx.room.PrimaryKey
 import java.util.UUID
 
 /**
- * Database entity for inventory items
+ * Data model for inventory items
  * 
- * Room database entity with annotations for database operations
+ * Simplified model for cloud operations without Room database annotations
  */
-@Entity(tableName = "items")
 data class Item(
-    @PrimaryKey
     val id: UUID = UUID.randomUUID(),
     val name: String, // Model name (e.g., "MSI Temup Leopard Pro")
     val category: String, // General category (e.g., "Laptop", "Mobile Phone", "Tablet")

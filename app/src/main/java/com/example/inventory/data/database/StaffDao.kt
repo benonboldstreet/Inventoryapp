@@ -28,4 +28,7 @@ interface StaffDao {
 
     @Query("SELECT * FROM staff WHERE department = :department")
     fun getStaffByDepartment(department: String): Flow<List<Staff>>
+
+    @Query("SELECT * FROM staff WHERE isActive = 1 ORDER BY name ASC")
+    fun getActiveStaff(): Flow<List<Staff>>
 } 

@@ -1,75 +1,63 @@
 package com.example.inventory.data.repository
 
-import com.example.inventory.data.database.Item
-import com.example.inventory.data.database.ItemDao
+import com.example.inventory.data.model.Item
 import kotlinx.coroutines.flow.Flow
 import java.util.UUID
 
 /**
- * Repository for managing Item data operations
+ * Repository interface for managing Item data operations
+ * 
+ * This defines the contract for item repository implementations,
+ * whether they're using local storage or cloud storage.
  */
-class ItemRepository(private val itemDao: ItemDao) {
-    
+interface ItemRepository {
     /**
      * Get all items as a Flow
      */
-    fun getAllItems(): Flow<List<Item>> = itemDao.getAllItems()
+    fun getAllItems(): Flow<List<Item>>
     
     /**
      * Get items by status as a Flow
      */
-    fun getItemsByStatus(status: String): Flow<List<Item>> = itemDao.getItemsByStatus(status)
+    fun getItemsByStatus(status: String): Flow<List<Item>>
     
     /**
      * Get items by type as a Flow
      */
-    fun getItemsByType(type: String): Flow<List<Item>> = itemDao.getItemsByType(type)
+    fun getItemsByType(type: String): Flow<List<Item>>
     
     /**
      * Get items by category as a Flow
      */
-    fun getItemsByCategory(category: String): Flow<List<Item>> = itemDao.getItemsByCategory(category)
+    fun getItemsByCategory(category: String): Flow<List<Item>>
     
     /**
      * Get all custom categories as a Flow
      */
-    fun getAllCategories(): Flow<List<String>> = itemDao.getAllCategories()
+    fun getAllCategories(): Flow<List<String>>
     
     /**
      * Get item by its barcode
      */
-    suspend fun getItemByBarcode(barcode: String): Item? = itemDao.getItemByBarcode(barcode)
+    suspend fun getItemByBarcode(barcode: String): Item?
     
     /**
      * Get item by ID
      */
-    suspend fun getItemById(id: UUID): Item? = itemDao.getItemById(id)
+    suspend fun getItemById(id: UUID): Item?
     
     /**
      * Insert a new item
-     * 
-     * [CLOUD ENDPOINT - CREATE] Direct database insertion of item
-     * Should be migrated to create items in cloud storage via API
      */
-    suspend fun insertItem(item: Item) = itemDao.insert(item)
+    suspend fun insertItem(item: Item)
     
     /**
      * Update an existing item
-     * 
-     * [CLOUD ENDPOINT - UPDATE] Direct database update of item with timestamp refresh
-     * Should be migrated to update items in cloud storage via API
      */
-    suspend fun updateItem(item: Item) {
-        // Ensure the lastModified timestamp is updated
-        val updatedItem = item.copy(lastModified = System.currentTimeMillis())
-        itemDao.update(updatedItem)
-    }
+    suspend fun updateItem(item: Item)
     
     /**
      * Delete an item
-     * 
-     * [CLOUD ENDPOINT - DELETE] Direct database deletion of item
-     * Should be migrated to delete items in cloud storage via API
      */
-    suspend fun deleteItem(item: Item) = itemDao.delete(item)
+    suspend fun deleteItem(item: Item)
 } 

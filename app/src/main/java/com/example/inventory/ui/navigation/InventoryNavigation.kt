@@ -17,6 +17,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -130,10 +131,14 @@ fun InventoryBottomNavBar(navController: NavHostController) {
  * Navigation host for the app
  */
 @Composable
-fun InventoryNavHost(navController: NavHostController) {
+fun InventoryNavHost(
+    navController: NavHostController,
+    modifier: Modifier = Modifier
+) {
     NavHost(
         navController = navController,
-        startDestination = InventoryDestinations.SPLASH_ROUTE
+        startDestination = InventoryDestinations.SPLASH_ROUTE,
+        modifier = modifier
     ) {
         // Splash screen
         composable(InventoryDestinations.SPLASH_ROUTE) {

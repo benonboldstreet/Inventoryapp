@@ -32,8 +32,8 @@ interface CheckoutLogDao {
     @Query("SELECT * FROM checkout_logs WHERE staffId = :staffId ORDER BY checkOutTime DESC")
     fun getCheckoutLogsByStaffId(staffId: UUID): Flow<List<CheckoutLog>>
 
-    @Query("SELECT * FROM checkout_logs WHERE checkInTime IS NULL")
-    fun getCurrentCheckouts(): Flow<List<CheckoutLog>>
+    @Query("SELECT * FROM checkout_logs WHERE checkInTime IS NULL ORDER BY checkOutTime DESC")
+    fun getActiveCheckouts(): Flow<List<CheckoutLog>>
 
     @Query("SELECT * FROM checkout_logs WHERE itemId = :itemId AND checkInTime IS NULL")
     suspend fun getCurrentCheckoutForItem(itemId: UUID): CheckoutLog?

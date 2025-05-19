@@ -1,17 +1,23 @@
 package com.example.inventory.data
 
 import android.content.Context
-import androidx.room.Room
-import com.example.inventory.data.database.InventoryDatabase
-import com.example.inventory.data.repository.CheckoutRepository
+import com.example.inventory.data.model.Item
+import com.example.inventory.data.model.Staff
+import com.example.inventory.data.model.CheckoutLog
 import com.example.inventory.data.repository.ItemRepository
 import com.example.inventory.data.repository.StaffRepository
+import com.example.inventory.data.repository.CheckoutRepository
 import com.example.inventory.data.repository.CloudItemRepository
 import com.example.inventory.data.repository.CloudStaffRepository
 import com.example.inventory.data.repository.CloudCheckoutRepository
+import kotlinx.coroutines.flow.Flow
+import java.util.UUID
 
 /**
  * Container for dependencies needed by the app
+ * 
+ * This provides access to the cloud repositories for inventory items,
+ * staff members, and checkout logs.
  */
 interface AppContainer {
     val itemRepository: ItemRepository
@@ -21,41 +27,24 @@ interface AppContainer {
 
 /**
  * Container for application-wide dependencies
+ * 
+ * CLOUD IMPLEMENTATION: This implementation provides cloud-based
+ * repositories that connect to Azure/cloud services.
+ * 
+ * Provides offline caching support by passing the application context
+ * to repository implementations.
  */
 class AppContainerImpl(private val context: Context) : AppContainer {
-    // Database instance - retained for potential fallback but not used in cloud implementation
-    private val database: InventoryDatabase by lazy {
-        Room.databaseBuilder(
-            context,
-            InventoryDatabase::class.java,
-            "inventory_database"
-        ).build()
-    }
-    
-    // CLOUD IMPLEMENTATION: Using cloud repositories instead of local database
+    // CLOUD IMPLEMENTATION: Initialize repositories with application context for offline caching
     override val itemRepository: ItemRepository by lazy {
-        // For cloud-only implementation, use CloudItemRepository
-        CloudItemRepository()
-        
-        // The original local implementation was:
-        // ItemRepository(database.itemDao())
+        CloudItemRepository(appContext = context)
     }
     
-    // CLOUD IMPLEMENTATION: Using cloud repositories instead of local database
     override val staffRepository: StaffRepository by lazy {
-        // For cloud-only implementation, use CloudStaffRepository 
-        CloudStaffRepository()
-        
-        // The original local implementation was:
-        // StaffRepository(database.staffDao())
+        CloudStaffRepository(appContext = context)
     }
     
-    // CLOUD IMPLEMENTATION: Using cloud repositories instead of local database
     override val checkoutRepository: CheckoutRepository by lazy {
-        // For cloud-only implementation, use CloudCheckoutRepository
-        CloudCheckoutRepository()
-        
-        // The original local implementation was:
-        // CheckoutRepository(database.checkoutLogDao())
+        CloudCheckoutRepository(appContext = context)
     }
 } 

@@ -13,14 +13,20 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.CloudDone
+import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.QrCodeScanner
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Divider
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -35,6 +41,8 @@ import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -47,15 +55,18 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
-import com.example.inventory.data.database.Item
+import com.example.inventory.data.model.Item
 import com.example.inventory.ui.components.StatusIndicator
 import com.example.inventory.ui.components.getStatusColor
 import com.example.inventory.ui.viewmodel.itemViewModel
+import com.example.inventory.ui.viewmodel.SharedViewModel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.Flow
@@ -63,23 +74,15 @@ import kotlinx.coroutines.flow.flowOf
 import java.util.UUID
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 
 // Enum for item filtering
 enum class ItemFilter {
     ALL, ACTIVE, ARCHIVED
-}
-
-// ViewModel to share data between screens
-object SharedViewModel {
-    var scannedBarcode = mutableStateOf("")
-    
-    fun setBarcode(barcode: String) {
-        scannedBarcode.value = barcode
-    }
-    
-    fun clearBarcode() {
-        scannedBarcode.value = ""
-    }
 }
 
 // Simple ItemRepository singleton for accessing categories
@@ -116,13 +119,34 @@ fun ItemListScreen(
 ) {
     val viewModel = itemViewModel()
     val allItems by viewModel.allItems.collectAsState(initial = emptyList())
+    val context = LocalContext.current
     
     var showAddItemDialog by remember { mutableStateOf(false) }
     val scannedBarcode = SharedViewModel.scannedBarcode.value
+    val recentlyViewedItems = SharedViewModel.recentlyViewedItems.value
+    val isCloudConnected = SharedViewModel.isCloudConnected.value
+    
     var searchQuery by remember { mutableStateOf("") }
     var itemFilter by remember { mutableStateOf(ItemFilter.ACTIVE) }
     
-    // Filter items based on active status and search query
+    // Add these new state variables
+    var selectedCategoryTab by remember { mutableStateOf("All") }
+    val coroutineScope = rememberCoroutineScope()
+    var categories by remember { mutableStateOf<List<String>>(emptyList()) }
+    
+    // Load categories
+    LaunchedEffect(Unit) {
+        try {
+            val repo = ItemRepository.getRepository(context)
+            val loadedCategories = repo.getAllCategories().first()
+            categories = listOf("All") + loadedCategories
+        } catch (e: Exception) {
+            // Handle error loading categories
+            categories = listOf("All", "Laptop", "Mobile Phone", "Tablet", "Accessory", "Other")
+        }
+    }
+    
+    // Filter items based on active status, search query, and category
     val filteredItems = allItems.filter { item ->
         // First filter by active/archived status
         when (itemFilter) {
@@ -130,6 +154,10 @@ fun ItemListScreen(
             ItemFilter.ACTIVE -> item.isActive
             ItemFilter.ARCHIVED -> !item.isActive
         }
+    }.filter { item ->
+        // Then filter by category if not "All"
+        if (selectedCategoryTab == "All") true
+        else item.category == selectedCategoryTab
     }.filter { item ->
         // Then filter by search query if one exists
         if (searchQuery.isBlank()) true
@@ -153,6 +181,27 @@ fun ItemListScreen(
             TopAppBar(
                 title = { Text("Inventory Items") },
                 actions = {
+                    // Cloud connectivity indicator
+                    if (isCloudConnected) {
+                        Icon(
+                            imageVector = Icons.Default.CloudDone,
+                            contentDescription = "Connected to Cloud",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.padding(horizontal = 8.dp)
+                        )
+                    } else {
+                        IconButton(onClick = { 
+                            // TODO: Add refresh cloud connection logic
+                            SharedViewModel.isCloudConnected.value = true
+                        }) {
+                            Icon(
+                                imageVector = Icons.Default.CloudOff,
+                                contentDescription = "Cloud Disconnected - Tap to retry",
+                                tint = MaterialTheme.colorScheme.error
+                            )
+                        }
+                    }
+                    
                     // Add barcode scanner button in the top app bar
                     IconButton(onClick = onBarcodeScanner) {
                         Icon(
@@ -203,19 +252,59 @@ fun ItemListScreen(
                 .padding(paddingValues)
                 .padding(horizontal = 16.dp)
         ) {
-            // Search bar
-            OutlinedTextField(
-                value = searchQuery,
-                onValueChange = { searchQuery = it },
+            // IMPROVED: Large prominent search bar with rounded corners and icon
+            Card(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(vertical = 8.dp),
-                placeholder = { Text("Search by name, type, barcode or category") },
-                leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search") },
-                singleLine = true
-            )
+                elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+                shape = RoundedCornerShape(24.dp)
+            ) {
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(8.dp),
+                    placeholder = { Text("Find items by name, barcode, etc.") },
+                    leadingIcon = { 
+                        Icon(
+                            Icons.Default.Search, 
+                            contentDescription = "Search",
+                            tint = MaterialTheme.colorScheme.primary
+                        ) 
+                    },
+                    trailingIcon = {
+                        if (searchQuery.isNotEmpty()) {
+                            IconButton(onClick = { searchQuery = "" }) {
+                                Text("Clear", color = MaterialTheme.colorScheme.primary)
+                            }
+                        }
+                    },
+                    singleLine = true,
+                    shape = RoundedCornerShape(24.dp)
+                )
+            }
             
-            // Filter chips
+            // NEW: Category tabs
+            if (categories.isNotEmpty()) {
+                TabRow(
+                    selectedTabIndex = categories.indexOf(selectedCategoryTab).coerceAtLeast(0),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 8.dp)
+                ) {
+                    categories.forEach { category ->
+                        Tab(
+                            selected = selectedCategoryTab == category,
+                            onClick = { selectedCategoryTab = category },
+                            text = { Text(category) }
+                        )
+                    }
+                }
+            }
+            
+            // Filter chips in a row
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -241,28 +330,133 @@ fun ItemListScreen(
                 )
             }
             
+            // NEW: Recently viewed items section
+            AnimatedVisibility(
+                visible = recentlyViewedItems.isNotEmpty(),
+                enter = fadeIn() + expandVertically(),
+                exit = fadeOut() + shrinkVertically()
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 8.dp)
+                ) {
+                    Text(
+                        text = "Recently Viewed",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(vertical = 8.dp)
+                    )
+                    
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        items(recentlyViewedItems) { item ->
+                            RecentItemCard(
+                                item = item,
+                                onClick = { onItemClick(item.id) }
+                            )
+                        }
+                    }
+                    
+                    Divider(modifier = Modifier.padding(vertical = 8.dp))
+                }
+            }
+            
+            // No items found message
             if (filteredItems.isEmpty()) {
-                Text(
-                    text = when (itemFilter) {
-                        ItemFilter.ALL -> if (searchQuery.isBlank()) "No items found" else "No results for '$searchQuery'"
-                        ItemFilter.ACTIVE -> if (searchQuery.isBlank()) "No active items found" else "No active items match '$searchQuery'"
-                        ItemFilter.ARCHIVED -> if (searchQuery.isBlank()) "No archived items found" else "No archived items match '$searchQuery'"
-                    },
-                    style = MaterialTheme.typography.bodyLarge,
-                    modifier = Modifier.padding(vertical = 16.dp)
-                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 32.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        Text(
+                            text = when {
+                                searchQuery.isNotEmpty() -> "No items match '$searchQuery'"
+                                selectedCategoryTab != "All" -> "No ${selectedCategoryTab.lowercase()} items found"
+                                else -> when(itemFilter) {
+                                    ItemFilter.ALL -> "No items found"
+                                    ItemFilter.ACTIVE -> "No active items found"
+                                    ItemFilter.ARCHIVED -> "No archived items found"
+                                }
+                            },
+                            style = MaterialTheme.typography.bodyLarge,
+                            textAlign = TextAlign.Center
+                        )
+                        
+                        Spacer(modifier = Modifier.height(16.dp))
+                        
+                        Text(
+                            text = "Tap the + button to add a new item",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
             } else {
                 // Items list
                 LazyColumn {
                     items(filteredItems) { item ->
                         ItemCard(
                             item = item,
-                            onClick = { onItemClick(item.id) }
+                            onClick = { 
+                                // Add to recently viewed when clicked
+                                SharedViewModel.addToRecentlyViewed(item)
+                                onItemClick(item.id) 
+                            }
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                     }
                 }
             }
+        }
+    }
+}
+
+// NEW: Card for recently viewed items
+@Composable
+fun RecentItemCard(
+    item: Item,
+    onClick: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .width(120.dp)
+            .clickable(onClick = onClick),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            // Status indicator circle at the top
+            StatusIndicator(
+                status = item.status,
+                modifier = Modifier.size(12.dp)
+            )
+            
+            Spacer(modifier = Modifier.height(4.dp))
+            
+            Text(
+                text = item.name,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Bold,
+                maxLines = 2,
+                textAlign = TextAlign.Center
+            )
+            
+            Text(
+                text = item.category,
+                style = MaterialTheme.typography.bodySmall,
+                maxLines = 1,
+                textAlign = TextAlign.Center
+            )
         }
     }
 }
