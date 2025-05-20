@@ -37,4 +37,7 @@ interface CheckoutLogDao {
 
     @Query("SELECT * FROM checkout_logs WHERE itemId = :itemId AND checkInTime IS NULL")
     suspend fun getCurrentCheckoutForItem(itemId: UUID): CheckoutLog?
+
+    @Query("SELECT * FROM checkout_logs")
+    suspend fun getAllCheckoutLogsSync(): List<CheckoutLog>
 } 

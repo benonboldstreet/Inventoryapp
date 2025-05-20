@@ -31,4 +31,7 @@ interface StaffDao {
 
     @Query("SELECT * FROM staff WHERE isActive = 1 ORDER BY name ASC")
     fun getActiveStaff(): Flow<List<Staff>>
+
+    @Query("SELECT * FROM staff")
+    suspend fun getAllStaffSync(): List<Staff>
 } 

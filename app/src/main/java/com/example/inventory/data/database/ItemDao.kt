@@ -40,4 +40,7 @@ interface ItemDao {
 
     @Query("SELECT DISTINCT category FROM items WHERE category NOT IN ('Laptop', 'Mobile Phone', 'Tablet', 'Accessory') ORDER BY category ASC")
     fun getAllCategories(): Flow<List<String>>
+
+    @Query("SELECT * FROM items")
+    suspend fun getAllItemsSync(): List<Item>
 } 
