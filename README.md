@@ -17,6 +17,16 @@ The most significant improvement is our understanding of the Firestore database 
 
 All database endpoints have been updated to reference Firestore collections directly rather than the previous REST API approach, which has simplified our code significantly.
 
+## Technical Documentation
+
+For developers working on this codebase:
+
+- [Code Reference Guide](CODE_REFERENCE.md) - A comprehensive map of all Firebase endpoints, key files, and implementation details with line numbers
+- [Firebase Database Guide](FIREBASE_DATABASE_GUIDE.md) - Guide to the database structure and field requirements
+- [Migration Decision](MIGRATION_DECISION.md) - Why we chose Firebase over alternatives
+
+The Code Reference Guide is particularly helpful as it provides exact file locations and line numbers for all Firebase collection references and key implementation details.
+
 ## Current Status
 
 **What's Working:**
