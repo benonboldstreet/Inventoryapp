@@ -2,6 +2,21 @@
 
 This Android application manages inventory items using Firebase Firestore as the backend database.
 
+## Progress Update
+
+**We've made massive progress in the last week!**
+
+While the app isn't 100% finished, we've successfully:
+- Completely migrated from Room database to Firebase Firestore
+- Set up proper database collections and document structures
+- Implemented all CRUD operations with Firebase endpoints
+- Connected UI components to the Firebase backend
+- Removed most legacy code and cleaned up the architecture
+
+The most significant improvement is our understanding of the Firestore database structure - knowing exactly what fields are needed and how they should be formatted has solved most of our initial issues.
+
+All database endpoints have been updated to reference Firestore collections directly rather than the previous REST API approach, which has simplified our code significantly.
+
 ## Current Status
 
 **What's Working:**
