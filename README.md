@@ -20,6 +20,26 @@ This Android application manages inventory items using Firebase Firestore as the
 
 The most critical requirement is that your database structure follows the exact format described in this README. The app is particularly sensitive to field names, data types, and the relationship between document IDs and the idString field.
 
+## Development Roadmap
+
+### Week 1: UI Improvements
+- [ ] Fix UI update lag when data changes in Firestore
+- [ ] Implement proper loading indicators
+- [ ] Fix archive view display issues
+- [ ] Test app with real-world data sets
+
+### Week 2: Error Handling & Performance
+- [ ] Add better network error messages
+- [ ] Implement proper offline mode indicators
+- [ ] Optimize Firestore queries for better performance
+- [ ] Add retry mechanisms for failed operations
+
+### Week 3: Cleanup & Polish
+- [ ] Remove remaining legacy code
+- [ ] Update remaining documentation
+- [ ] Add final UI polish
+- [ ] Final testing across different devices
+
 ## Firebase Migration
 
 We've switched the app from using a local database to Firebase Firestore. This gives us:

@@ -6,7 +6,7 @@
    - Firebase offers a generous free tier that covers all our current needs
    - No monthly costs unlike Azure which requires paid subscriptions
    - Can handle up to 50,000 reads and 20,000 writes per day for free
-   - Free storage up to 1GB
+   - Perfect for our app's current scale
 
 2. **Simple to Set Up**
    - No complex server configuration
