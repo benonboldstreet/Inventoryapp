@@ -36,6 +36,8 @@ This migration required changing how we store and access data throughout the app
 
 See [MIGRATION_SUMMARY.md](MIGRATION_SUMMARY.md) for more details on what we did.
 
+For an explanation of why we chose Firebase instead of Azure or other alternatives, see [MIGRATION_DECISION.md](MIGRATION_DECISION.md).
+
 ## Recent Cleanup
 
 We've removed several unused files to keep the codebase clean:
