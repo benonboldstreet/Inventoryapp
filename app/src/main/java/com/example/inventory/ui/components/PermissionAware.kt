@@ -1,5 +1,6 @@
 package com.example.inventory.ui.components
 
+import androidx.compose.material3.Button
 import androidx.compose.runtime.Composable
 import com.example.inventory.api.RoleBasedAccessControl
 import com.example.inventory.api.RoleBasedAccessControl.Permission
@@ -58,23 +59,16 @@ fun PermissionButton(
     content: @Composable () -> Unit
 ) {
     val hasPermission = when {
-        // Single permission check
         permission != null -> 
             RoleBasedAccessControl.hasPermission(permission)
-        
-        // Multiple permissions - require all
         permissions.isNotEmpty() -> 
             RoleBasedAccessControl.hasAllPermissions(*permissions.toTypedArray())
-        
-        // Multiple permissions - any is sufficient
         anyPermission.isNotEmpty() -> 
             RoleBasedAccessControl.hasAnyPermission(*anyPermission.toTypedArray())
-        
-        // No permission specified - enabled
         else -> true
     }
     
-    androidx.compose.material.Button(
+    Button(
         onClick = onClick,
         enabled = enabled && hasPermission
     ) {

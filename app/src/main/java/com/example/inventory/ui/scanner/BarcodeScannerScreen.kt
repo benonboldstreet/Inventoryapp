@@ -26,6 +26,8 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -46,9 +48,9 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.navigation.NavController
 import androidx.navigation.compose.currentBackStackEntryAsState
-import com.example.inventory.data.database.CheckoutLog
-import com.example.inventory.data.database.Item
-import com.example.inventory.data.database.Staff
+import com.example.inventory.data.model.CheckoutLog
+import com.example.inventory.data.model.Item
+import com.example.inventory.data.model.Staff
 import com.example.inventory.ui.navigation.InventoryDestinations
 import com.example.inventory.ui.utils.RequestCameraPermission
 import com.example.inventory.ui.viewmodel.CheckoutViewModel
@@ -136,12 +138,12 @@ fun BarcodeScannerScreen(
                     scannedItem = item
                     
                     // Check if the item is currently checked out
-                    val checkout = checkoutViewModel.getCurrentCheckoutForItem(item.id)
+                    val checkout = checkoutViewModel.getCurrentCheckoutForItem(item.id).first()
                     
                     if (checkout != null) {
                         // Item is checked out - prepare for check-in
                         scannedCheckout = checkout
-                        scannedStaff = staffViewModel.getStaffById(checkout.staffId)
+                        scannedStaff = staffViewModel.getStaffById(checkout.staffId).first()
                         
                         // Show check-in dialog
                         showCheckinDialog = true
@@ -330,22 +332,11 @@ fun BarcodeScannerScreen(
         
         // Show error dialog if needed
         if (showErrorDialog) {
-            androidx.compose.material3.AlertDialog(
-                onDismissRequest = {
+            ErrorDialog(
+                message = errorMessage,
+                onDismiss = {
                     showErrorDialog = false
                     resetScanState()
-                },
-                title = { Text("Barcode Error") },
-                text = { Text(errorMessage) },
-                confirmButton = {
-                    androidx.compose.material3.TextButton(
-                        onClick = {
-                            showErrorDialog = false
-                            resetScanState()
-                        }
-                    ) {
-                        Text("OK")
-                    }
                 }
             )
         }
@@ -417,4 +408,24 @@ fun CameraPreviewWithBarcodeScanner(
             modifier = Modifier.fillMaxSize()
         )
     }
+}
+
+/**
+ * Dialog for displaying error messages
+ */
+@Composable
+fun ErrorDialog(
+    message: String,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Barcode Error") },
+        text = { Text(message) },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("OK")
+            }
+        }
+    )
 } 

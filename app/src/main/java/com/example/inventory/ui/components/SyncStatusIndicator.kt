@@ -34,7 +34,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.inventory.api.OfflineCache
-import com.example.inventory.api.SyncStatus
+import com.example.inventory.data.model.SyncStatus
 import com.example.inventory.ui.viewmodel.SharedViewModel
 import kotlinx.coroutines.delay
 

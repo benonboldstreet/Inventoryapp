@@ -28,14 +28,16 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
-import com.example.inventory.data.database.Staff
+import com.example.inventory.data.model.Staff
 import com.example.inventory.ui.navigation.InventoryDestinations
 import java.util.UUID
 
 /**
  * Dialog for selecting a staff member with option to take a photo
+ * Note: Photo functionality is temporarily disabled
  */
 @Composable
 fun StaffSelectorWithPhotoDialog(
@@ -46,7 +48,6 @@ fun StaffSelectorWithPhotoDialog(
     onDismiss: () -> Unit
 ) {
     var selectedStaff by remember { mutableStateOf<Staff?>(null) }
-    var takePhoto by remember { mutableStateOf(true) } // Default to taking a photo
     
     Dialog(onDismissRequest = onDismiss) {
         Card(
@@ -60,18 +61,11 @@ fun StaffSelectorWithPhotoDialog(
                     .padding(16.dp)
             ) {
                 Text(
-                    text = "Check Out Item",
+                    text = "Select Staff for Checkout",
                     style = MaterialTheme.typography.headlineSmall
                 )
                 
                 Spacer(modifier = Modifier.height(16.dp))
-                
-                Text(
-                    text = "Select Staff Member",
-                    style = MaterialTheme.typography.titleMedium
-                )
-                
-                Spacer(modifier = Modifier.height(8.dp))
                 
                 if (staffList.isEmpty()) {
                     Text("No staff members available. Please add staff first.")
@@ -79,7 +73,7 @@ fun StaffSelectorWithPhotoDialog(
                     LazyColumn(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .weight(1f, fill = false)
+                            .height(200.dp)
                             .padding(bottom = 16.dp)
                     ) {
                         items(staffList) { staff ->
@@ -92,38 +86,6 @@ fun StaffSelectorWithPhotoDialog(
                         }
                     }
                 }
-                
-                Spacer(modifier = Modifier.height(16.dp))
-                
-                // Take photo option with camera icon
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { takePhoto = !takePhoto }
-                        .padding(vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    RadioButton(
-                        selected = takePhoto,
-                        onClick = { takePhoto = !takePhoto }
-                    )
-                    
-                    Text(
-                        text = "Take condition photo",
-                        style = MaterialTheme.typography.bodyLarge,
-                        modifier = Modifier
-                            .weight(1f)
-                            .padding(start = 8.dp)
-                    )
-                    
-                    Icon(
-                        imageVector = Icons.Filled.PhotoCamera,
-                        contentDescription = "Camera",
-                        modifier = Modifier.size(24.dp)
-                    )
-                }
-                
-                Spacer(modifier = Modifier.height(16.dp))
                 
                 // Action buttons
                 Row(
@@ -139,16 +101,10 @@ fun StaffSelectorWithPhotoDialog(
                     
                     Button(
                         onClick = {
+                            // Only proceed if staff is selected
                             selectedStaff?.let { staff ->
-                                if (takePhoto) {
-                                    // Navigate to photo capture screen with route
-                                    val route = "${InventoryDestinations.PHOTO_CAPTURE_ROUTE}/${itemId}/${staff.id}"
-                                    android.util.Log.d("StaffSelectorDialog", "Navigating directly to photo capture with route: $route")
-                                    onNavigateToPhotoCapture(route)
-                                } else {
-                                    // Proceed without photo
-                                    onStaffSelectedWithPhoto(staff, false)
-                                }
+                                // Always use false for takePhoto
+                                onStaffSelectedWithPhoto(staff, false)
                             }
                         },
                         enabled = selectedStaff != null,

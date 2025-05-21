@@ -3,43 +3,103 @@ package com.example.inventory.ui.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import com.example.inventory.data.database.CheckoutLog
+import com.example.inventory.data.model.CheckoutLog
 import com.example.inventory.data.repository.CheckoutRepository
 import com.example.inventory.data.repository.ItemRepository
+import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import java.util.UUID
+import javax.inject.Inject
 
-class CheckoutViewModel(
+@HiltViewModel
+class CheckoutViewModel @Inject constructor(
     private val checkoutRepository: CheckoutRepository,
     private val itemRepository: ItemRepository
 ) : ViewModel() {
-
-    // Get all checkout logs as a Flow
+    
+    // Direct access to repository - no mapping needed since we're using model objects
     val allCheckoutLogs: Flow<List<CheckoutLog>> = checkoutRepository.getAllCheckoutLogs()
     
-    // Get current checkouts (items not checked in yet)
-    val currentCheckouts: Flow<List<CheckoutLog>> = checkoutRepository.getCurrentCheckouts()
+    // Active checkouts (not checked in yet)
+    val activeCheckouts: Flow<List<CheckoutLog>> = checkoutRepository.getCurrentCheckouts()
     
-    /**
-     * Get checkout logs for a specific item
-     */
+    // Completed checkouts (already checked in)
+    val completedCheckouts: Flow<List<CheckoutLog>> = checkoutRepository.getAllCheckoutLogs()
+        .map { logs -> logs.filter { it.getCheckInTimeAsLong() != null } }
+    
+    // Get checkout by ID
+    fun getCheckoutById(id: UUID): Flow<CheckoutLog?> = flow {
+        val log = checkoutRepository.getCheckoutLogById(id)
+        emit(log)
+    }
+    
+    // Get checkouts for a specific item
+    fun getCheckoutsByItemId(itemId: UUID): Flow<List<CheckoutLog>> = 
+        checkoutRepository.getCheckoutLogsByItemId(itemId)
+    
+    // Get checkouts for a specific staff member
+    fun getCheckoutsByStaffId(staffId: UUID): Flow<List<CheckoutLog>> = 
+        checkoutRepository.getCheckoutLogsByStaffId(staffId)
+    
+    // Get current checkout for specific item
+    fun getCurrentCheckoutForItem(itemId: UUID): Flow<CheckoutLog?> = flow {
+        val log = checkoutRepository.getCurrentCheckoutForItem(itemId)
+        emit(log)
+    }
+    
+    // Get checkout logs by item - convenience method for UI
     fun getCheckoutLogsByItem(itemId: UUID): Flow<List<CheckoutLog>> = 
         checkoutRepository.getCheckoutLogsByItemId(itemId)
     
-    /**
-     * Get checkout logs for a specific staff member
-     */
-    fun getCheckoutLogsByStaff(staffId: UUID): Flow<List<CheckoutLog>> = 
+    // Get checkout logs by staff - convenience method for UI
+    fun getCheckoutLogsByStaff(staffId: UUID): Flow<List<CheckoutLog>> =
         checkoutRepository.getCheckoutLogsByStaffId(staffId)
     
-    /**
-     * Check out an item to a staff member
-     * 
-     * [CLOUD ENDPOINT - CREATE/UPDATE] Creates checkout record AND updates item status to "Checked Out"
-     * Should be migrated to create checkout records and update items in cloud storage
-     * This requires a transaction or coordination between two cloud operations
-     */
+    // Add a new checkout
+    fun addCheckout(checkout: CheckoutLog) {
+        viewModelScope.launch {
+            checkoutRepository.insertCheckoutLog(checkout)
+        }
+    }
+    
+    // Update an existing checkout
+    fun updateCheckout(checkout: CheckoutLog) {
+        viewModelScope.launch {
+            checkoutRepository.updateCheckoutLog(checkout)
+        }
+    }
+    
+    // Delete a checkout
+    fun deleteCheckout(checkout: CheckoutLog) {
+        viewModelScope.launch {
+            checkoutRepository.deleteCheckoutLog(checkout)
+        }
+    }
+    
+    // Mark a checkout as complete
+    fun completeCheckout(checkout: CheckoutLog) {
+        viewModelScope.launch {
+            val updatedCheckout = checkout.copy(
+                checkInTime = com.google.firebase.Timestamp.now(),
+                status = "CHECKED_IN"
+            )
+            checkoutRepository.updateCheckoutLog(updatedCheckout)
+            
+            // Also update the item status
+            checkout.itemId.let { itemId ->
+                val item = itemRepository.getItemById(itemId)
+                item?.let { existingItem ->
+                    val updatedItem = existingItem.copy(status = "Available")
+                    itemRepository.updateItem(updatedItem)
+                }
+            }
+        }
+    }
+    
+    // Check out an item to a staff member
     fun checkOutItem(itemId: UUID, staffId: UUID) {
         viewModelScope.launch {
             // Get the item to update its status
@@ -48,25 +108,48 @@ class CheckoutViewModel(
             // Only proceed if the item exists and is available
             item?.let {
                 if (it.status == "Available") {
-                    // Create checkout log
-                    checkoutRepository.checkOutItem(itemId, staffId)
+                    // Create checkout log and update the item in the repository
+                    val checkout = checkoutRepository.checkOutItem(itemId, staffId)
                     
                     // Update item status
-                    val updatedItem = it.copy(status = "Checked Out")
+                    val updatedItem = it.copy(
+                        status = "Checked Out",
+                        lastModified = System.currentTimeMillis()
+                    )
                     itemRepository.updateItem(updatedItem)
                 }
             }
         }
     }
     
-    /**
-     * Check out an item with a photo
-     * 
-     * [CLOUD ENDPOINT - CREATE/UPDATE] Creates checkout record with photo AND updates item status
-     * Should be migrated to create checkout records with photo storage and update items in cloud
-     * This requires a transaction or coordination between two cloud operations plus blob storage
-     */
-    fun checkOutItemWithPhoto(itemId: UUID, staffId: UUID, photoPath: String) {
+    // Check in an item
+    fun checkInItem(checkoutLogId: UUID) {
+        viewModelScope.launch {
+            // Get the checkout log
+            val checkoutLog = checkoutRepository.getCheckoutLogById(checkoutLogId)
+            
+            // Only proceed if we have a valid checkout log without a check-in time
+            checkoutLog?.let {
+                if (it.getCheckInTimeAsLong() == null) {
+                    // Update the checkout log with check-in time and update the repository
+                    val updatedCheckout = checkoutRepository.checkInItem(it)
+                    
+                    // Get the item to update its status back to available
+                    val item = itemRepository.getItemById(it.itemId)
+                    item?.let { foundItem ->
+                        val updatedItem = foundItem.copy(
+                            status = "Available",
+                            lastModified = System.currentTimeMillis()
+                        )
+                        itemRepository.updateItem(updatedItem)
+                    }
+                }
+            }
+        }
+    }
+    
+    // Check out an item with a photo
+    fun checkOutItemWithPhoto(itemId: UUID, staffId: UUID, photoPath: String?) {
         viewModelScope.launch {
             // Get the item to update its status
             val item = itemRepository.getItemById(itemId)
@@ -75,18 +158,17 @@ class CheckoutViewModel(
             item?.let {
                 if (it.status == "Available") {
                     // Create checkout log with photo
-                    val checkoutLog = CheckoutLog(
-                        itemId = itemId,
-                        staffId = staffId,
-                        checkOutTime = System.currentTimeMillis(),
-                        checkInTime = null,
-                        photoPath = photoPath,
-                        lastModified = System.currentTimeMillis()
-                    )
-                    checkoutRepository.insertCheckoutLog(checkoutLog)
+                    if (photoPath != null) {
+                        checkoutRepository.checkOutItemWithPhoto(itemId, staffId, photoPath)
+                    } else {
+                        checkoutRepository.checkOutItem(itemId, staffId)
+                    }
                     
                     // Update item status
-                    val updatedItem = it.copy(status = "Checked Out")
+                    val updatedItem = it.copy(
+                        status = "Checked Out",
+                        lastModified = System.currentTimeMillis()
+                    )
                     itemRepository.updateItem(updatedItem)
                 }
             }
@@ -94,71 +176,20 @@ class CheckoutViewModel(
     }
     
     /**
-     * Check in an item
-     * 
-     * [CLOUD ENDPOINT - UPDATE] Sets checkInTime and updates item status back to "Available"
-     * Should be migrated to update checkout records and items in cloud storage
-     * This requires a transaction or coordination between two cloud operations
+     * Factory for creating CheckoutViewModel instances with dependencies
      */
-    fun checkInItem(checkoutLogId: UUID) {
-        viewModelScope.launch {
-            // Get the checkout log
-            val checkoutLog = checkoutRepository.getCheckoutLogById(checkoutLogId)
-            
-            // Only proceed if we have a valid checkout log without a check-in time
-            checkoutLog?.let {
-                if (it.checkInTime == null) {
-                    // Update the checkout log with check-in time
-                    checkoutRepository.checkInItem(it)
-                    
-                    // Get the item to update its status back to available
-                    val item = itemRepository.getItemById(it.itemId)
-                    item?.let { foundItem ->
-                        val updatedItem = foundItem.copy(status = "Available")
-                        itemRepository.updateItem(updatedItem)
-                    }
+    companion object {
+        class Factory(
+            private val checkoutRepository: CheckoutRepository,
+            private val itemRepository: ItemRepository
+        ) : ViewModelProvider.Factory {
+            @Suppress("UNCHECKED_CAST")
+            override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                if (modelClass.isAssignableFrom(CheckoutViewModel::class.java)) {
+                    return CheckoutViewModel(checkoutRepository, itemRepository) as T
                 }
+                throw IllegalArgumentException("Unknown ViewModel class")
             }
-        }
-    }
-    
-    /**
-     * Get checkout log by ID
-     */
-    suspend fun getCheckoutLogById(id: UUID): CheckoutLog? = 
-        checkoutRepository.getCheckoutLogById(id)
-    
-    /**
-     * Get current checkout for an item
-     */
-    suspend fun getCurrentCheckoutForItem(itemId: UUID): CheckoutLog? = 
-        checkoutRepository.getCurrentCheckoutForItem(itemId)
-    
-    /**
-     * Delete a checkout log
-     * 
-     * [CLOUD ENDPOINT - DELETE] Permanently removes a checkout record from the database
-     * Should be migrated to delete checkout records in cloud storage
-     */
-    fun deleteCheckoutLog(checkoutLog: CheckoutLog) {
-        viewModelScope.launch {
-            checkoutRepository.deleteCheckoutLog(checkoutLog)
-        }
-    }
-    
-    /**
-     * Factory for creating CheckoutViewModel with dependency injection
-     */
-    class Factory(
-        private val checkoutRepository: CheckoutRepository,
-        private val itemRepository: ItemRepository
-    ) : ViewModelProvider.Factory {
-        @Suppress("UNCHECKED_CAST")
-        override fun <T : ViewModel> create(modelClass: Class<T>): T {
-            if (modelClass.isAssignableFrom(CheckoutViewModel::class.java)) {
-                return CheckoutViewModel(checkoutRepository, itemRepository) as T
-            }
-            throw IllegalArgumentException("Unknown ViewModel class")
         }
     }
 } 

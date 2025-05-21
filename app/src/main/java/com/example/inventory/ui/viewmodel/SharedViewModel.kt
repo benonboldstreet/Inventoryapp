@@ -25,6 +25,10 @@ object SharedViewModel {
     // Network connectivity listeners
     private val connectivityListeners = mutableListOf<(Boolean) -> Unit>()
     
+    // For showing archived items (after archiving an item)
+    private val _showArchivedItems = MutableStateFlow(false)
+    val showArchivedItems = _showArchivedItems.asStateFlow()
+    
     /**
      * Set the scanned barcode value
      */
@@ -53,6 +57,13 @@ object SharedViewModel {
     }
     
     /**
+     * Set the cloud connectivity state
+     */
+    fun setCloudConnected(isConnected: Boolean) {
+        updateConnectivity(isConnected)
+    }
+    
+    /**
      * Update cloud connectivity state
      */
     fun updateConnectivity(isConnected: Boolean) {
@@ -73,5 +84,9 @@ object SharedViewModel {
      */
     fun removeConnectivityListener(listener: (Boolean) -> Unit) {
         connectivityListeners.remove(listener)
+    }
+    
+    fun setShowArchivedItems(show: Boolean) {
+        _showArchivedItems.value = show
     }
 } 

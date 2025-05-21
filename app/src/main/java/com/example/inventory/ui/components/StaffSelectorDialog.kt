@@ -25,7 +25,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
-import com.example.inventory.data.database.Staff
+import com.example.inventory.data.model.Staff
+import java.util.UUID
 
 /**
  * Dialog for selecting a staff member

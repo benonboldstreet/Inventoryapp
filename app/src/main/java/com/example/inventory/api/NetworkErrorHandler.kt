@@ -1,6 +1,7 @@
 package com.example.inventory.api
 
 import android.util.Log
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
 import com.example.inventory.ui.viewmodel.SharedViewModel
 import kotlinx.coroutines.flow.Flow
@@ -16,27 +17,29 @@ import java.net.UnknownHostException
  * with clear error messages that can be displayed to users.
  */
 object NetworkErrorHandler {
-    // Tracks the last error that occurred for display in the UI
-    val lastErrorMessage = mutableStateOf<String?>(null)
+    // Private mutable state
+    private val _lastErrorMessage = mutableStateOf<String?>(null)
+    private val _isLoading = mutableStateOf(false)
     
-    // Tracks if a network operation is in progress
-    val isLoading = mutableStateOf(false)
+    // Public immutable access
+    val lastErrorMessage: MutableState<String?> = _lastErrorMessage
+    val isLoading: MutableState<Boolean> = _isLoading
     
     // Initialize by subscribing to SharedViewModel network state
     init {
         // When cloud connectivity changes, update our error state accordingly
         if (!SharedViewModel.isCloudConnected.value) {
-            lastErrorMessage.value = "Not connected to cloud services. Please check your internet connection."
+            _lastErrorMessage.value = "Not connected to cloud services. Please check your internet connection."
         }
         
         // This is a callback to set our error message automatically when connectivity is lost
         SharedViewModel.addConnectivityListener { isConnected ->
             if (!isConnected) {
-                lastErrorMessage.value = "Lost connection to cloud services. Please check your internet connection."
+                _lastErrorMessage.value = "Lost connection to cloud services. Please check your internet connection."
             } else {
                 // Only clear errors if they were connectivity related
-                if (lastErrorMessage.value?.contains("connect") == true || 
-                    lastErrorMessage.value?.contains("Connection") == true) {
+                if (_lastErrorMessage.value?.contains("connect") == true || 
+                    _lastErrorMessage.value?.contains("Connection") == true) {
                     clearErrors()
                 }
             }
@@ -51,15 +54,18 @@ object NetworkErrorHandler {
      * @return The result of the API call, or null if an error occurred
      */
     suspend fun <T> handleApiCall(operationName: String, apiCall: suspend () -> T): T? {
-        isLoading.value = true
-        lastErrorMessage.value = null
+        // Set loading state
+        _isLoading.value = true
+        _lastErrorMessage.value = null
         
         return try {
             val result = apiCall()
-            isLoading.value = false
+            // Clear loading state
+            _isLoading.value = false
             result
         } catch (e: Exception) {
-            val errorMessage = when (e) {
+            // Create a local variable for the error message
+            val errorMessageText = when (e) {
                 is UnknownHostException -> "Cannot connect to cloud server. Please check your internet connection."
                 is ConnectException -> "Connection to cloud server failed. Server may be down."
                 is SocketTimeoutException -> "Connection to cloud server timed out. Please try again."
@@ -67,17 +73,18 @@ object NetworkErrorHandler {
             }
             
             // Log the error
-            Log.e("CloudInventory", "Error in $operationName: $errorMessage", e)
+            Log.e("CloudInventory", "Error in $operationName: $errorMessageText", e)
             
             // Update the error message for UI display
-            lastErrorMessage.value = errorMessage
+            _lastErrorMessage.value = errorMessageText
             
             // Update SharedViewModel connectivity if this is a connection error
             if (e is UnknownHostException || e is ConnectException) {
-                SharedViewModel.isCloudConnected.value = false
+                SharedViewModel.setCloudConnected(false)
             }
             
-            isLoading.value = false
+            // Clear loading state
+            _isLoading.value = false
             null
         }
     }
@@ -95,15 +102,18 @@ object NetworkErrorHandler {
         apiCall: suspend () -> T,
         emptyValue: T
     ): Flow<T> = flow {
-        isLoading.value = true
-        lastErrorMessage.value = null
+        // Set loading state
+        _isLoading.value = true
+        _lastErrorMessage.value = null
         
         try {
             val result = apiCall()
-            isLoading.value = false
+            // Clear loading state
+            _isLoading.value = false
             emit(result)
         } catch (e: Exception) {
-            val errorMessage = when (e) {
+            // Create a local variable for the error message
+            val errorMessageText = when (e) {
                 is UnknownHostException -> "Cannot connect to cloud server. Please check your internet connection."
                 is ConnectException -> "Connection to cloud server failed. Server may be down."
                 is SocketTimeoutException -> "Connection to cloud server timed out. Please try again."
@@ -111,17 +121,18 @@ object NetworkErrorHandler {
             }
             
             // Log the error
-            Log.e("CloudInventory", "Error in $operationName: $errorMessage", e)
+            Log.e("CloudInventory", "Error in $operationName: $errorMessageText", e)
             
             // Update the error message for UI display
-            lastErrorMessage.value = errorMessage
+            _lastErrorMessage.value = errorMessageText
             
             // Update SharedViewModel connectivity if this is a connection error
             if (e is UnknownHostException || e is ConnectException) {
-                SharedViewModel.isCloudConnected.value = false
+                SharedViewModel.setCloudConnected(false)
             }
             
-            isLoading.value = false
+            // Clear loading state
+            _isLoading.value = false
             emit(emptyValue)
         }
     }
@@ -130,6 +141,6 @@ object NetworkErrorHandler {
      * Clear any previous error messages
      */
     fun clearErrors() {
-        lastErrorMessage.value = null
+        _lastErrorMessage.value = null
     }
 } 

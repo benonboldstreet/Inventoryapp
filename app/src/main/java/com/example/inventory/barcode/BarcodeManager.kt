@@ -4,7 +4,8 @@ import android.content.Context
 import android.util.Log
 import com.example.inventory.api.NetworkRetry
 import com.example.inventory.api.NetworkModule
-import com.example.inventory.data.database.Item
+import com.example.inventory.data.model.Item
+import com.example.inventory.api.ItemDto
 import com.example.inventory.data.repository.ItemRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -60,12 +61,66 @@ object BarcodeManager {
         return try {
             // Use network retry for resilience
             NetworkRetry.executeWithRetry {
-                val itemDto = NetworkModule.itemApiService.getItemByBarcode(barcode)
-                itemDto.toEntity()
+                val apiResult = NetworkModule.itemApiService.getItemByBarcode(barcode)
+                
+                // Convert the result to an Item
+                convertToItem(apiResult)
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error finding item by barcode direct API: $barcode", e)
             null
+        }
+    }
+    
+    /**
+     * Convert API result to Item
+     * Handles different return types from the API
+     */
+    private fun convertToItem(apiResult: Any?): Item? {
+        return when (apiResult) {
+            // If it's an ItemDto, convert directly
+            is ItemDto -> {
+                Item(
+                    idString = apiResult.id ?: "",
+                    name = apiResult.name,
+                    category = apiResult.category,
+                    type = apiResult.type,
+                    barcode = apiResult.barcode,
+                    condition = apiResult.condition,
+                    status = apiResult.status,
+                    photoPath = apiResult.photoPath,
+                    isActive = apiResult.isActive,
+                    lastModified = apiResult.lastModified ?: System.currentTimeMillis()
+                )
+            }
+            // If it's a Map, extract values
+            is Map<*, *> -> {
+                try {
+                    @Suppress("UNCHECKED_CAST")
+                    val typedMap = apiResult as Map<String, Any?>
+                    
+                    Item(
+                        idString = (typedMap["id"] as? String) ?: "",
+                        name = (typedMap["name"] as? String) ?: "",
+                        category = (typedMap["category"] as? String) ?: "",
+                        type = (typedMap["type"] as? String) ?: "",
+                        barcode = (typedMap["barcode"] as? String) ?: "",
+                        condition = (typedMap["condition"] as? String) ?: "",
+                        status = (typedMap["status"] as? String) ?: "",
+                        photoPath = typedMap["photoPath"] as? String,
+                        isActive = typedMap["isActive"] as? Boolean ?: true,
+                        lastModified = typedMap["lastModified"] as? Long ?: System.currentTimeMillis()
+                    )
+                } catch (e: ClassCastException) {
+                    Log.e(TAG, "Error casting Map data: ${e.message}")
+                    null
+                }
+            }
+            // Fallback for other types
+            else -> {
+                Log.e(TAG, "API returned an unexpected data type: ${apiResult?.javaClass?.name}")
+                null
+            }
         }
     }
     

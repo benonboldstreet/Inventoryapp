@@ -12,9 +12,11 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Divider
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FilterChip
@@ -30,16 +32,24 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
-import com.example.inventory.data.database.Staff
+import com.example.inventory.data.model.Staff
+// import com.example.inventory.ui.components.AddStaffDialog - Removed unused import
 import com.example.inventory.ui.viewmodel.staffViewModel
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.width
 import androidx.compose.ui.graphics.Color
+// No longer needed: import androidx.compose.material3.ChipDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ListItem
+import androidx.compose.ui.unit.sp
+import androidx.compose.material3.FilterChipDefaults
+import java.util.UUID
 
 enum class StaffFilter {
     ALL, ACTIVE, ARCHIVED
@@ -92,16 +102,10 @@ fun StaffListScreen(
     ) { paddingValues ->
         
         if (showAddStaffDialog) {
-            AddStaffDialog(
+            StaffAddDialog(
                 onDismiss = { showAddStaffDialog = false },
-                onConfirm = { name, department, email, phone, position ->
-                    viewModel.addStaff(
-                        name = name,
-                        department = department,
-                        email = email,
-                        phone = phone,
-                        position = position
-                    )
+                onConfirm = { staff ->
+                    viewModel.addStaff(staff)
                     showAddStaffDialog = false
                 }
             )
@@ -135,19 +139,22 @@ fun StaffListScreen(
                 FilterChip(
                     selected = staffFilter == StaffFilter.ACTIVE,
                     onClick = { staffFilter = StaffFilter.ACTIVE },
-                    label = { Text("Active") }
+                    label = { Text("Active") },
+                    colors = FilterChipDefaults.filterChipColors()
                 )
                 
                 FilterChip(
                     selected = staffFilter == StaffFilter.ARCHIVED,
                     onClick = { staffFilter = StaffFilter.ARCHIVED },
-                    label = { Text("Archived") }
+                    label = { Text("Archived") },
+                    colors = FilterChipDefaults.filterChipColors()
                 )
                 
                 FilterChip(
                     selected = staffFilter == StaffFilter.ALL,
                     onClick = { staffFilter = StaffFilter.ALL },
-                    label = { Text("All") }
+                    label = { Text("All") },
+                    colors = FilterChipDefaults.filterChipColors()
                 )
             }
             
@@ -226,9 +233,9 @@ fun StaffCard(
 }
 
 @Composable
-fun AddStaffDialog(
+fun StaffAddDialog(
     onDismiss: () -> Unit,
-    onConfirm: (name: String, department: String, email: String, phone: String, position: String) -> Unit
+    onConfirm: (Staff) -> Unit
 ) {
     var name by remember { mutableStateOf("") }
     var department by remember { mutableStateOf("") }
@@ -341,7 +348,17 @@ fun AddStaffDialog(
                             departmentError = department.isBlank()
                             
                             if (!nameError && !departmentError) {
-                                onConfirm(name, department, email, phone, position)
+                                // Create a proper Staff object with UUID
+                                val staff = Staff(
+                                    idString = UUID.randomUUID().toString(),
+                                    name = name,
+                                    department = department,
+                                    email = email,
+                                    phone = phone,
+                                    position = position,
+                                    isActive = true
+                                )
+                                onConfirm(staff)
                             }
                         }
                     ) {

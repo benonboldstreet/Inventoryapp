@@ -1,5 +1,11 @@
 package com.example.inventory.api
 
+// This file is now deprecated.
+// Use com.example.inventory.data.model.SyncStatus instead
+// 
+// To avoid breaking existing code, this import statement provides backward compatibility
+import com.example.inventory.data.model.SyncStatus
+
 /**
  * Represents the current state of data synchronization with the cloud
  */

@@ -1,6 +1,5 @@
 package com.example.inventory.ui.viewmodel
 
-import android.app.Activity
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -8,6 +7,7 @@ import com.example.inventory.InventoryApplication
 
 /**
  * Utility functions for creating ViewModels in Compose
+ * These functions help with dependency injection for ViewModels
  */
 
 /**
@@ -18,7 +18,7 @@ fun itemViewModel(): ItemViewModel {
     val context = LocalContext.current
     val application = context.applicationContext as InventoryApplication
     return viewModel(
-        factory = ItemViewModel.Factory(application.container.itemRepository)
+        factory = ItemViewModel.Companion.Factory(application.container.itemRepository)
     )
 }
 
@@ -30,7 +30,7 @@ fun staffViewModel(): StaffViewModel {
     val context = LocalContext.current
     val application = context.applicationContext as InventoryApplication
     return viewModel(
-        factory = StaffViewModel.Factory(application.container.staffRepository)
+        factory = StaffViewModel.Companion.Factory(application.container.staffRepository)
     )
 }
 
@@ -42,7 +42,7 @@ fun checkoutViewModel(): CheckoutViewModel {
     val context = LocalContext.current
     val application = context.applicationContext as InventoryApplication
     return viewModel(
-        factory = CheckoutViewModel.Factory(
+        factory = CheckoutViewModel.Companion.Factory(
             application.container.checkoutRepository,
             application.container.itemRepository
         )

@@ -10,6 +10,11 @@ import com.example.inventory.data.repository.CheckoutRepository
 import com.example.inventory.data.repository.CloudItemRepository
 import com.example.inventory.data.repository.CloudStaffRepository
 import com.example.inventory.data.repository.CloudCheckoutRepository
+import com.example.inventory.data.firebase.FirebaseItemRepository
+import com.example.inventory.data.firebase.FirebaseStaffRepository
+import com.example.inventory.data.firebase.FirebaseCheckoutRepository
+import com.example.inventory.data.firebase.FirebaseConfig
+import com.example.inventory.data.firebase.FirebaseStorageUtils
 import kotlinx.coroutines.flow.Flow
 import java.util.UUID
 
@@ -35,16 +40,18 @@ interface AppContainer {
  * to repository implementations.
  */
 class AppContainerImpl(private val context: Context) : AppContainer {
-    // CLOUD IMPLEMENTATION: Initialize repositories with application context for offline caching
+    private val firebaseConfig: FirebaseConfig by lazy { FirebaseConfig() }
+    private val firebaseStorageUtils: FirebaseStorageUtils by lazy { FirebaseStorageUtils(firebaseConfig) }
+
     override val itemRepository: ItemRepository by lazy {
-        CloudItemRepository(appContext = context)
+        FirebaseItemRepository(firebaseConfig)
     }
     
     override val staffRepository: StaffRepository by lazy {
-        CloudStaffRepository(appContext = context)
+        FirebaseStaffRepository(firebaseConfig)
     }
     
     override val checkoutRepository: CheckoutRepository by lazy {
-        CloudCheckoutRepository(appContext = context)
+        FirebaseCheckoutRepository(firebaseConfig, firebaseStorageUtils)
     }
 } 

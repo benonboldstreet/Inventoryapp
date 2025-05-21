@@ -12,9 +12,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -23,8 +23,9 @@ import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.QrCodeScanner
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Divider
@@ -37,13 +38,10 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -51,8 +49,8 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -60,6 +58,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import com.example.inventory.data.model.Item
@@ -67,18 +66,15 @@ import com.example.inventory.ui.components.StatusIndicator
 import com.example.inventory.ui.components.getStatusColor
 import com.example.inventory.ui.viewmodel.itemViewModel
 import com.example.inventory.ui.viewmodel.SharedViewModel
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flowOf
 import java.util.UUID
+import com.example.inventory.util.FirestoreChecker
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
+import kotlinx.coroutines.launch
+import android.widget.Toast
+import com.google.firebase.firestore.FirebaseFirestore
+import kotlinx.coroutines.tasks.await
 
 // Enum for item filtering
 enum class ItemFilter {
@@ -120,44 +116,63 @@ fun ItemListScreen(
     val viewModel = itemViewModel()
     val allItems by viewModel.allItems.collectAsState(initial = emptyList())
     val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+    
+    // State for direct query results
+    var directQueryResults by remember { mutableStateOf<List<Item>>(emptyList()) }
     
     var showAddItemDialog by remember { mutableStateOf(false) }
-    val scannedBarcode = SharedViewModel.scannedBarcode.value
-    val recentlyViewedItems = SharedViewModel.recentlyViewedItems.value
-    val isCloudConnected = SharedViewModel.isCloudConnected.value
+    val scannedBarcode by SharedViewModel.scannedBarcode.collectAsState()
+    val isCloudConnected by SharedViewModel.isCloudConnected.collectAsState()
     
     var searchQuery by remember { mutableStateOf("") }
     var itemFilter by remember { mutableStateOf(ItemFilter.ACTIVE) }
     
-    // Add these new state variables
-    var selectedCategoryTab by remember { mutableStateOf("All") }
-    val coroutineScope = rememberCoroutineScope()
-    var categories by remember { mutableStateOf<List<String>>(emptyList()) }
+    // Get the showArchivedItems flag from SharedViewModel
+    val showArchivedItems by SharedViewModel.showArchivedItems.collectAsState()
     
-    // Load categories
-    LaunchedEffect(Unit) {
-        try {
-            val repo = ItemRepository.getRepository(context)
-            val loadedCategories = repo.getAllCategories().first()
-            categories = listOf("All") + loadedCategories
-        } catch (e: Exception) {
-            // Handle error loading categories
-            categories = listOf("All", "Laptop", "Mobile Phone", "Tablet", "Accessory", "Other")
+    // React to showArchivedItems changes
+    LaunchedEffect(showArchivedItems) {
+        if (showArchivedItems) {
+            // Switch to archived items filter
+            itemFilter = ItemFilter.ARCHIVED
+            // Reset the flag after we've used it
+            SharedViewModel.setShowArchivedItems(false)
         }
     }
     
-    // Filter items based on active status, search query, and category
-    val filteredItems = allItems.filter { item ->
+    // When switching to ARCHIVED filter, perform a direct query
+    LaunchedEffect(itemFilter) {
+        android.util.Log.d("ItemListScreen", "Filter changed to: $itemFilter")
+        
+        if (itemFilter == ItemFilter.ARCHIVED) {
+            android.util.Log.d("ItemListScreen", "Querying archived items directly from Firestore")
+            // Use the direct query method instead of filtering
+            viewModel.directQueryArchivedItems { items ->
+                directQueryResults = items
+                android.util.Log.d("ItemListScreen", "Received ${items.size} archived items from direct query")
+            }
+        }
+    }
+    
+    // Choose items source based on filter type
+    val itemsToFilter = if (itemFilter == ItemFilter.ARCHIVED && directQueryResults.isNotEmpty()) {
+        // Use direct query results for archived items
+        android.util.Log.d("ItemListScreen", "Using direct query results for archived items: ${directQueryResults.size} items")
+        directQueryResults
+    } else {
+        // Use normal flow for active and all items
+        allItems
+    }
+    
+    // Filter items based on active status and search query only
+    val filteredItems = itemsToFilter.filter { item ->
         // First filter by active/archived status
         when (itemFilter) {
             ItemFilter.ALL -> true
             ItemFilter.ACTIVE -> item.isActive
             ItemFilter.ARCHIVED -> !item.isActive
         }
-    }.filter { item ->
-        // Then filter by category if not "All"
-        if (selectedCategoryTab == "All") true
-        else item.category == selectedCategoryTab
     }.filter { item ->
         // Then filter by search query if one exists
         if (searchQuery.isBlank()) true
@@ -176,41 +191,360 @@ fun ItemListScreen(
         }
     }
     
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Inventory Items") },
-                actions = {
-                    // Cloud connectivity indicator
-                    if (isCloudConnected) {
-                        Icon(
-                            imageVector = Icons.Default.CloudDone,
-                            contentDescription = "Connected to Cloud",
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.padding(horizontal = 8.dp)
-                        )
-                    } else {
-                        IconButton(onClick = { 
-                            // TODO: Add refresh cloud connection logic
-                            SharedViewModel.isCloudConnected.value = true
-                        }) {
-                            Icon(
-                                imageVector = Icons.Default.CloudOff,
-                                contentDescription = "Cloud Disconnected - Tap to retry",
-                                tint = MaterialTheme.colorScheme.error
-                            )
+    // Inside the composable, add this logging after the allItems collection
+    LaunchedEffect(allItems) {
+        android.util.Log.d("ItemListScreen", "==== ITEMS DEBUG ====")
+        android.util.Log.d("ItemListScreen", "Total items from repository: ${allItems.size}")
+        android.util.Log.d("ItemListScreen", "Active items: ${allItems.count { it.isActive }}")
+        android.util.Log.d("ItemListScreen", "Inactive (archived) items: ${allItems.count { !it.isActive }}")
+        
+        // Log each archived item for debugging
+        allItems.filter { !it.isActive }.forEach { item ->
+            android.util.Log.d("ItemListScreen", "Archived item: id=${item.id}, name=${item.name}")
+        }
+    }
+
+    // Add this logging when the filter changes
+    LaunchedEffect(itemFilter) {
+        android.util.Log.d("ItemListScreen", "Filter changed to: $itemFilter")
+        android.util.Log.d("ItemListScreen", "Filtered items count: ${filteredItems.size}")
+    }
+    
+    // Add this right after setting the filteredItems but before the LaunchedEffect
+    // Log detailed information when in ARCHIVED mode
+    if (itemFilter == ItemFilter.ARCHIVED) {
+        android.util.Log.d("ItemListScreen", "===== ARCHIVED VIEW DETAILS =====")
+        android.util.Log.d("ItemListScreen", "Archived filter is active")
+        android.util.Log.d("ItemListScreen", "Filtered items count: ${filteredItems.size}")
+        android.util.Log.d("ItemListScreen", "Direct query results count: ${directQueryResults.size}")
+        
+        if (filteredItems.isEmpty()) {
+            android.util.Log.d("ItemListScreen", "No archived items to display")
+            
+            // Double check if there are actually inactive items in the dataset
+            val inactiveItems = allItems.filter { !it.isActive }
+            if (inactiveItems.isNotEmpty()) {
+                android.util.Log.e("ItemListScreen", "ERROR: Found ${inactiveItems.size} inactive items but they're not being displayed!")
+                inactiveItems.forEach { item ->
+                    android.util.Log.d("ItemListScreen", "  Inactive item not displayed: id=${item.id}, name=${item.name}, isActive=${item.isActive}")
+                }
+            }
+        } else {
+            android.util.Log.d("ItemListScreen", "Displaying ${filteredItems.size} archived items")
+            filteredItems.forEach { item ->
+                android.util.Log.d("ItemListScreen", "  Displaying archived item: id=${item.id}, name=${item.name}")
+            }
+        }
+    }
+    
+    // After the existing button for checking Firestore directly
+    if (itemFilter == ItemFilter.ARCHIVED) {
+        // Existing debug info column is still here
+        
+        // Add a button to directly check Firestore
+        Button(
+            onClick = {
+                coroutineScope.launch {
+                    try {
+                        // Call FirestoreChecker utility
+                        FirestoreChecker.checkArchivedItems(context)
+                        
+                        // Also run direct query again
+                        viewModel.directQueryArchivedItems { items ->
+                            directQueryResults = items
+                            Toast.makeText(
+                                context,
+                                "Direct query found ${items.size} archived items",
+                                Toast.LENGTH_LONG
+                            ).show()
                         }
-                    }
-                    
-                    // Add barcode scanner button in the top app bar
-                    IconButton(onClick = onBarcodeScanner) {
-                        Icon(
-                            imageVector = Icons.Default.QrCodeScanner,
-                            contentDescription = "Scan Barcode"
-                        )
+                    } catch (e: Exception) {
+                        android.util.Log.e("ItemListScreen", "Error checking archived items: ${e.message}", e)
+                        Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_LONG).show()
                     }
                 }
+            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.tertiary
             )
+        ) {
+            Text("Check Firestore Directly")
+        }
+        
+        // Simplify the Fix Archived Items button
+        Button(
+            onClick = {
+                // Show message first
+                Toast.makeText(
+                    context,
+                    "Checking for archived items...",
+                    Toast.LENGTH_SHORT
+                ).show()
+                
+                // Just run the direct query to show what's available
+                viewModel.directQueryArchivedItems { items ->
+                    directQueryResults = items
+                    if (items.isNotEmpty()) {
+                        Toast.makeText(
+                            context,
+                            "Found ${items.size} archived items",
+                            Toast.LENGTH_LONG
+                        ).show()
+                    } else {
+                        Toast.makeText(
+                            context,
+                            "No archived items found. Try archiving an item first.",
+                            Toast.LENGTH_LONG
+                        ).show()
+                    }
+                }
+            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.secondary
+            )
+        ) {
+            Text("Find Archived Items", color = Color.White)
+        }
+        
+        // Add a button to create a test archived item directly
+        Button(
+            onClick = {
+                // Create a test item directly in Firestore
+                val firestore = FirebaseFirestore.getInstance()
+                val testItemId = UUID.randomUUID().toString()
+                
+                // Create a map with all required item fields
+                val testItem = mapOf(
+                    "idString" to testItemId,
+                    "name" to "Test Archived Item",
+                    "category" to "Test",
+                    "type" to "Debug",
+                    "barcode" to "TEST123",
+                    "condition" to "Good",
+                    "status" to "Available",
+                    "description" to "This is a test archived item",
+                    "photoPath" to "",
+                    "isActive" to false,  // Explicitly set as Boolean false
+                    "lastModified" to System.currentTimeMillis()
+                )
+                
+                // Add the item to Firestore
+                firestore.collection("items").document(testItemId)
+                    .set(testItem)
+                    .addOnSuccessListener {
+                        Toast.makeText(
+                            context, 
+                            "Test archived item created in Firestore", 
+                            Toast.LENGTH_LONG
+                        ).show()
+                        
+                        // Refresh to show the new item
+                        viewModel.directQueryArchivedItems { items ->
+                            directQueryResults = items
+                        }
+                    }
+                    .addOnFailureListener { e ->
+                        Toast.makeText(
+                            context, 
+                            "Error creating test item: ${e.message}", 
+                            Toast.LENGTH_LONG
+                        ).show()
+                    }
+            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.primary
+            )
+        ) {
+            Text("Create Test Archived Item", color = Color.White)
+        }
+    }
+    
+    // After the filter chips but before the rest of the content
+    if (itemFilter == ItemFilter.ARCHIVED) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 8.dp)
+                .padding(horizontal = 16.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .padding(16.dp)
+        ) {
+            Text(
+                text = "Archived Items Debug Info",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
+            
+            Spacer(modifier = Modifier.height(8.dp))
+            
+            Text(
+                text = "Total items from repository: ${allItems.size}",
+                style = MaterialTheme.typography.bodySmall
+            )
+            
+            Text(
+                text = "Items with isActive=false: ${allItems.count { !it.isActive }}",
+                style = MaterialTheme.typography.bodySmall
+            )
+            
+            Text(
+                text = "Direct query results: ${directQueryResults.size}",
+                style = MaterialTheme.typography.bodySmall
+            )
+            
+            Text(
+                text = "Currently displaying: ${filteredItems.size} items",
+                style = MaterialTheme.typography.bodySmall,
+                color = if (filteredItems.isEmpty()) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
+            )
+            
+            // Display the first archived item if any
+            val inactiveItems = allItems.filter { !it.isActive }
+            if (inactiveItems.isNotEmpty()) {
+                val firstInactive = inactiveItems.first()
+                Text(
+                    text = "First inactive item: ${firstInactive.name} (ID: ${firstInactive.id})",
+                    style = MaterialTheme.typography.bodySmall
+                )
+            } else if (directQueryResults.isNotEmpty()) {
+                val firstDirect = directQueryResults.first()
+                Text(
+                    text = "First direct query item: ${firstDirect.name} (ID: ${firstDirect.id}, isActive=${firstDirect.isActive})",
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+        }
+    }
+    
+    Scaffold(
+        topBar = {
+            Column {
+                TopAppBar(
+                    title = { Text("Inventory Items") },
+                    actions = {
+                        // Cloud connectivity indicator
+                        IconButton(onClick = { }) {
+                            Icon(
+                                imageVector = if (isCloudConnected) Icons.Default.CloudDone else Icons.Default.CloudOff,
+                                contentDescription = if (isCloudConnected) "Cloud Connected" else "Cloud Disconnected",
+                                tint = if (isCloudConnected) MaterialTheme.colorScheme.primary else Color.Gray
+                            )
+                        }
+                        // QR code scanner
+                        IconButton(onClick = { onBarcodeScanner() }) {
+                            Icon(Icons.Default.QrCodeScanner, contentDescription = "Scan Barcode")
+                        }
+                    }
+                )
+                
+                // Debug button to check Firestore data directly
+                Button(
+                    onClick = {
+                        val firestore = FirebaseFirestore.getInstance()
+                        coroutineScope.launch {
+                            try {
+                                // Check all three collections
+                                val collectionsToCheck = listOf("items", "staff", "checkouts")
+                                val results = StringBuilder("Firestore Collections:\n")
+                                
+                                for (collection in collectionsToCheck) {
+                                    val snapshot = firestore.collection(collection).get().await()
+                                    results.append("- $collection: ${snapshot.size()} documents\n")
+                                    
+                                    // Log details about first document in each collection
+                                    if (snapshot.documents.isNotEmpty()) {
+                                        val firstDoc = snapshot.documents.first()
+                                        results.append("  Fields: ${firstDoc.data?.keys?.joinToString()}\n")
+                                        
+                                        // Add special check for isActive field
+                                        val isActiveField = firstDoc.get("isActive")
+                                        if (isActiveField != null) {
+                                            results.append("  isActive: $isActiveField (${isActiveField.javaClass.simpleName})\n")
+                                        }
+                                    }
+                                }
+                                
+                                // Also log Firestore instance details
+                                results.append("\nApp Instance Info:\n")
+                                results.append("- DB URL: ${firestore.app.options.databaseUrl ?: "null"}\n")
+                                results.append("- Project ID: ${firestore.app.options.projectId ?: "null"}\n")
+                                
+                                // Show in toast and log
+                                val message = results.toString()
+                                Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+                                android.util.Log.d("FirestoreDebug", message)
+                                
+                                // Directly check listeners
+                                viewModel.checkRepositoryListeners()
+                            } catch (e: Exception) {
+                                Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_LONG).show()
+                                android.util.Log.e("ItemListDebug", "Error querying Firestore", e)
+                            }
+                        }
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiary)
+                ) {
+                    Text("Debug: Check All Collections")
+                }
+                
+                // Button to add a test item to Firestore
+                Button(
+                    onClick = {
+                        val firestore = FirebaseFirestore.getInstance()
+                        val itemId = UUID.randomUUID().toString()
+                        val testItem = mapOf(
+                            "idString" to itemId,
+                            "name" to "Test Item ${System.currentTimeMillis()}",
+                            "category" to "Test Category",
+                            "type" to "Test Type",
+                            "barcode" to "TEST-${System.currentTimeMillis()}",
+                            "condition" to "Good",
+                            "status" to "Available",
+                            "description" to "Test item created from debug button",
+                            "photoPath" to null,
+                            "isActive" to true,
+                            "lastModified" to System.currentTimeMillis()
+                        )
+                        
+                        coroutineScope.launch {
+                            try {
+                                // Add the item
+                                firestore.collection("items").document(itemId).set(testItem).await()
+                                // Verify it was added
+                                val doc = firestore.collection("items").document(itemId).get().await()
+                                if (doc.exists()) {
+                                    val message = "Test item created successfully! ID: $itemId"
+                                    Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+                                    android.util.Log.d("ItemListDebug", "Created test item: $testItem")
+                                } else {
+                                    Toast.makeText(context, "Failed to create test item", Toast.LENGTH_LONG).show()
+                                }
+                            } catch (e: Exception) {
+                                Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_LONG).show()
+                                android.util.Log.e("ItemListDebug", "Error creating test item", e)
+                            }
+                        }
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
+                ) {
+                    Text("Debug: Create Test Item")
+                }
+            }
         },
         floatingActionButton = {
             ExtendedFloatingActionButton(
@@ -229,15 +563,8 @@ fun ItemListScreen(
                     showAddItemDialog = false 
                     SharedViewModel.clearBarcode()
                 },
-                onConfirm = { name, type, barcode, condition, status, category ->
-                    viewModel.addItem(
-                        name = name,
-                        type = type,
-                        barcode = barcode,
-                        condition = condition,
-                        status = status,
-                        category = category
-                    )
+                onConfirm = { item ->
+                    viewModel.addItem(item)
                     showAddItemDialog = false
                     SharedViewModel.clearBarcode()
                 },
@@ -252,7 +579,7 @@ fun ItemListScreen(
                 .padding(paddingValues)
                 .padding(horizontal = 16.dp)
         ) {
-            // IMPROVED: Large prominent search bar with rounded corners and icon
+            // Improved search bar with rounded corners and icon
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -266,7 +593,7 @@ fun ItemListScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(8.dp),
-                    placeholder = { Text("Find items by name, barcode, etc.") },
+                    placeholder = { Text("Search items by name, barcode, type, etc.") },
                     leadingIcon = { 
                         Icon(
                             Icons.Default.Search, 
@@ -284,24 +611,6 @@ fun ItemListScreen(
                     singleLine = true,
                     shape = RoundedCornerShape(24.dp)
                 )
-            }
-            
-            // NEW: Category tabs
-            if (categories.isNotEmpty()) {
-                TabRow(
-                    selectedTabIndex = categories.indexOf(selectedCategoryTab).coerceAtLeast(0),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 8.dp)
-                ) {
-                    categories.forEach { category ->
-                        Tab(
-                            selected = selectedCategoryTab == category,
-                            onClick = { selectedCategoryTab = category },
-                            text = { Text(category) }
-                        )
-                    }
-                }
             }
             
             // Filter chips in a row
@@ -330,41 +639,15 @@ fun ItemListScreen(
                 )
             }
             
-            // NEW: Recently viewed items section
-            AnimatedVisibility(
-                visible = recentlyViewedItems.isNotEmpty(),
-                enter = fadeIn() + expandVertically(),
-                exit = fadeOut() + shrinkVertically()
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 8.dp)
-                ) {
-                    Text(
-                        text = "Recently Viewed",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(vertical = 8.dp)
-                    )
-                    
-                    LazyRow(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        items(recentlyViewedItems) { item ->
-                            RecentItemCard(
-                                item = item,
-                                onClick = { onItemClick(item.id) }
-                            )
-                        }
-                    }
-                    
-                    Divider(modifier = Modifier.padding(vertical = 8.dp))
-                }
-            }
-            
             // No items found message
             if (filteredItems.isEmpty()) {
+                // Add detailed debug logging
+                android.util.Log.d("ItemListScreen", "=== DEBUG: EMPTY FILTERED ITEMS ===")
+                android.util.Log.d("ItemListScreen", "Current filter: $itemFilter")
+                android.util.Log.d("ItemListScreen", "Total items in dataset: ${allItems.size}")
+                android.util.Log.d("ItemListScreen", "Active items: ${allItems.count { it.isActive }}")
+                android.util.Log.d("ItemListScreen", "Archived items: ${allItems.count { !it.isActive }}")
+                
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -378,7 +661,6 @@ fun ItemListScreen(
                         Text(
                             text = when {
                                 searchQuery.isNotEmpty() -> "No items match '$searchQuery'"
-                                selectedCategoryTab != "All" -> "No ${selectedCategoryTab.lowercase()} items found"
                                 else -> when(itemFilter) {
                                     ItemFilter.ALL -> "No items found"
                                     ItemFilter.ACTIVE -> "No active items found"
@@ -400,18 +682,17 @@ fun ItemListScreen(
                     }
                 }
             } else {
-                // Items list
-                LazyColumn {
+                // Items grid instead of list for better visual display
+                LazyVerticalGrid(
+                    columns = GridCells.Adaptive(minSize = 160.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
                     items(filteredItems) { item ->
-                        ItemCard(
+                        ItemGridCard(
                             item = item,
-                            onClick = { 
-                                // Add to recently viewed when clicked
-                                SharedViewModel.addToRecentlyViewed(item)
-                                onItemClick(item.id) 
-                            }
+                            onClick = { onItemClick(item.id) }
                         )
-                        Spacer(modifier = Modifier.height(8.dp))
                     }
                 }
             }
@@ -419,68 +700,76 @@ fun ItemListScreen(
     }
 }
 
-// NEW: Card for recently viewed items
+// New grid-style card for items
 @Composable
-fun RecentItemCard(
+fun ItemGridCard(
     item: Item,
     onClick: () -> Unit
 ) {
     Card(
         modifier = Modifier
-            .width(120.dp)
+            .fillMaxWidth()
+            .height(140.dp)
             .clickable(onClick = onClick),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(
-            modifier = Modifier.padding(8.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(12.dp),
+            verticalArrangement = Arrangement.SpaceBetween
         ) {
-            // Status indicator circle at the top
-            StatusIndicator(
-                status = item.status,
-                modifier = Modifier.size(12.dp)
-            )
+            // Status indicator at the top
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                StatusIndicator(
+                    status = item.status,
+                    modifier = Modifier.size(12.dp)
+                )
+                
+                Spacer(modifier = Modifier.width(4.dp))
+                
+                Text(
+                    text = item.status,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = getStatusColor(item.status)
+                )
+            }
             
-            Spacer(modifier = Modifier.height(4.dp))
-            
+            // Item name with potential strikethrough if archived
             Text(
                 text = item.name,
-                style = MaterialTheme.typography.bodyMedium,
+                style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 maxLines = 2,
-                textAlign = TextAlign.Center
+                overflow = TextOverflow.Ellipsis,
+                textDecoration = if (!item.isActive) TextDecoration.LineThrough else TextDecoration.None
             )
             
-            Text(
-                text = item.category,
-                style = MaterialTheme.typography.bodySmall,
-                maxLines = 1,
-                textAlign = TextAlign.Center
-            )
+            // Bottom info section
+            Column {
+                Text(
+                    text = item.type,
+                    style = MaterialTheme.typography.bodySmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                
+                if (!item.isActive) {
+                    Text(
+                        text = "Archived",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+            }
         }
     }
 }
 
-@Composable
-fun ItemsList(
-    items: List<Item>,
-    onItemClick: (UUID) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    LazyColumn(
-        modifier = modifier.padding(16.dp)
-    ) {
-        items(items) { item ->
-            ItemCard(
-                item = item,
-                onClick = { onItemClick(item.id) }
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
+// Keep original ItemCard for possible reuse
 @Composable
 fun ItemCard(
     item: Item,
@@ -490,6 +779,7 @@ fun ItemCard(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(
             modifier = Modifier.padding(16.dp)
@@ -518,7 +808,7 @@ fun ItemCard(
                     )
                     
                     Text(
-                        text = "Category: ${item.category}",
+                        text = item.type,
                         style = MaterialTheme.typography.bodyMedium
                     )
                 }
@@ -548,7 +838,7 @@ fun ItemCard(
 @Composable
 fun AddItemDialog(
     onDismiss: () -> Unit,
-    onConfirm: (name: String, type: String, barcode: String, condition: String, status: String, category: String) -> Unit,
+    onConfirm: (item: Item) -> Unit,
     onScanBarcode: () -> Unit,
     initialBarcode: String = ""
 ) {
@@ -557,35 +847,13 @@ fun AddItemDialog(
     var barcode by remember { mutableStateOf(initialBarcode) }
     var condition by remember { mutableStateOf("Good") }
     var status by remember { mutableStateOf("Available") }
+    var description by remember { mutableStateOf("") }
     
     // Set barcode if initialBarcode is provided
     LaunchedEffect(initialBarcode) {
         if (initialBarcode.isNotEmpty()) {
             barcode = initialBarcode
         }
-    }
-    
-    // Category selection
-    var selectedCategory by remember { mutableStateOf("") }
-    var isCustomCategory by remember { mutableStateOf(false) }
-    var customCategory by remember { mutableStateOf("") }
-    val predefinedCategories = listOf("Laptop", "Mobile Phone", "Tablet", "Accessory", "Custom Category")
-    var expandedCategory by remember { mutableStateOf(false) }
-    
-    // For other categories dropdown
-    var expandedOtherCategories by remember { mutableStateOf(false) }
-    var otherCategoriesList by remember { mutableStateOf(emptyList<String>()) }
-    
-    // Load categories from the viewModel
-    val context = LocalContext.current
-    val itemRepository = ItemRepository.getRepository(context)
-
-    LaunchedEffect(Unit) {
-        val categories = itemRepository.getAllCategories().first()
-        otherCategoriesList = categories
-            .filter { category -> category !in listOf("Laptop", "Mobile Phone", "Tablet", "Accessory") }
-            .distinct()
-            .sorted()
     }
     
     // Condition options
@@ -630,103 +898,34 @@ fun AddItemDialog(
 
                 Spacer(modifier = Modifier.height(8.dp))
                 
-                // Category dropdown
-                Column {
-                    OutlinedTextField(
-                        value = selectedCategory,
-                        onValueChange = { selectedCategory = it },
-                        label = { Text("Category *") },
-                        trailingIcon = {
-                            Icon(
-                                Icons.Default.ArrowDropDown,
-                                contentDescription = "Dropdown",
-                                modifier = Modifier.clickable { expandedCategory = !expandedCategory }
-                            )
-                        },
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    
-                    DropdownMenu(
-                        expanded = expandedCategory,
-                        onDismissRequest = { expandedCategory = false }
-                    ) {
-                        predefinedCategories.forEach { option ->
-                            DropdownMenuItem(
-                                text = { Text(option) },
-                                onClick = {
-                                    when (option) {
-                                        "Custom Category" -> {
-                                            isCustomCategory = true
-                                            selectedCategory = ""
-                                        }
-                                        else -> {
-                                            selectedCategory = option
-                                            isCustomCategory = false
-                                        }
-                                    }
-                                    expandedCategory = false
-                                }
-                            )
-                        }
-                        
-                        // Add recently used categories if available
-                        if (otherCategoriesList.isNotEmpty()) {
-                            Divider(modifier = Modifier.padding(vertical = 4.dp))
-                            Text(
-                                text = "Recently Used Categories",
-                                style = MaterialTheme.typography.labelMedium,
-                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
-                            )
-                            
-                            otherCategoriesList.forEach { category ->
-                                DropdownMenuItem(
-                                    text = { Text(category) },
-                                    onClick = {
-                                        selectedCategory = category
-                                        isCustomCategory = false
-                                        expandedCategory = false
-                                    }
-                                )
-                            }
-                        }
-                    }
-                }
-                
-                // Custom category input field
-                AnimatedVisibility(visible = isCustomCategory) {
-                    OutlinedTextField(
-                        value = customCategory,
-                        onValueChange = { 
-                            customCategory = it
-                            selectedCategory = it  // Update the selectedCategory as the user types
-                        },
-                        label = { Text("Enter Custom Category *") },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 8.dp),
-                        singleLine = true
-                    )
-                }
-                
-                Spacer(modifier = Modifier.height(8.dp))
-                
-                // Item name (model number)
+                // Name field
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
-                    label = { Text("Item Name/Model *") },
-                    placeholder = { Text("e.g., MSI Temup Leopard Pro") },
+                    label = { Text("Item Name *") },
+                    placeholder = { Text("Enter item name") },
                     modifier = Modifier.fillMaxWidth()
                 )
                 
                 Spacer(modifier = Modifier.height(8.dp))
                 
-                // Brand/manufacturer
+                // Type field (simple, no categories)
                 OutlinedTextField(
                     value = type,
                     onValueChange = { type = it },
-                    label = { Text("Brand/Manufacturer *") },
-                    placeholder = { Text("e.g., Dell, Apple, Lenovo") },
+                    label = { Text("Type *") },
+                    placeholder = { Text("Enter item type") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                // Description field
+                OutlinedTextField(
+                    value = description,
+                    onValueChange = { description = it },
+                    label = { Text("Description") },
+                    placeholder = { Text("Enter item description") },
                     modifier = Modifier.fillMaxWidth()
                 )
                 
@@ -763,14 +962,15 @@ fun AddItemDialog(
                         }
                     }
                 }
+
+                Spacer(modifier = Modifier.height(24.dp))
                 
-                Spacer(modifier = Modifier.height(16.dp))
-                
+                // Action buttons
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
+                    horizontalArrangement = Arrangement.End
                 ) {
-                    androidx.compose.material3.TextButton(
+                    TextButton(
                         onClick = onDismiss
                     ) {
                         Text("Cancel")
@@ -778,19 +978,28 @@ fun AddItemDialog(
                     
                     Spacer(modifier = Modifier.width(8.dp))
                     
-                    androidx.compose.material3.Button(
+                    Button(
                         onClick = {
-                            val effectiveCategory = if (isCustomCategory) customCategory else selectedCategory
-                            onConfirm(name, type, barcode, condition, status, effectiveCategory)
+                            if (name.isNotBlank() && barcode.isNotBlank() && type.isNotBlank()) {
+                                val newItem = Item(
+                                    id = UUID.randomUUID(),
+                                    name = name,
+                                    type = type,
+                                    barcode = barcode,
+                                    category = type, // Use type as category for backward compatibility
+                                    condition = condition,
+                                    status = status,
+                                    description = description,
+                                    isActive = true,
+                                    lastModified = System.currentTimeMillis(),
+                                    photoPath = null
+                                )
+                                onConfirm(newItem)
+                            }
                         },
-                        enabled = name.isNotBlank() && 
-                                 (selectedCategory.isNotBlank() || (isCustomCategory && customCategory.isNotBlank())) && 
-                                 type.isNotBlank() && 
-                                 condition.isNotBlank() && 
-                                 status.isNotBlank(),
-                        modifier = Modifier.padding(top = 16.dp)
+                        enabled = name.isNotBlank() && barcode.isNotBlank() && type.isNotBlank()
                     ) {
-                        Text("Add Item")
+                        Text("Add")
                     }
                 }
             }

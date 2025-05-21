@@ -3,9 +3,13 @@ package com.example.inventory.api
 import android.content.Context
 import android.util.Log
 import androidx.compose.runtime.mutableStateOf
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.example.inventory.data.model.User
+import com.example.inventory.data.model.UserRole
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -203,18 +207,9 @@ object AuthManager {
 /**
  * User data class representing an authenticated user
  */
-data class User(
-    val id: UUID,
-    val name: String,
-    val email: String,
-    val role: UserRole
-)
+// This class has been moved to com.example.inventory.data.model.User
 
 /**
  * User roles for access control
  */
-enum class UserRole {
-    USER,       // Regular user with basic permissions
-    MANAGER,    // Manager with additional permissions
-    ADMIN       // Administrator with full access
-} 
+// This enum has been moved to com.example.inventory.data.model.UserRole 

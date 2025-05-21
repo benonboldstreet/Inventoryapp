@@ -236,10 +236,7 @@ fun InventoryNavHost(
             val staffId = backStackEntry.arguments?.getString("staffId")
             StaffDetailScreen(
                 staffId = staffId?.let { UUID.fromString(it) },
-                onNavigateBack = { navController.popBackStack() },
-                onItemClick = { itemId ->
-                    navController.navigate("${InventoryDestinations.ITEM_DETAIL_ROUTE}/$itemId")
-                }
+                onNavigateBack = { navController.popBackStack() }
             )
         }
         

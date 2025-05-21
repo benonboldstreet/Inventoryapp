@@ -2,7 +2,7 @@ package com.example.inventory.ui.screens
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.*
+import androidx.compose.material3.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
@@ -43,7 +43,7 @@ fun LoginScreen(
         // App logo or icon could go here
         Text(
             text = "Inventory Cloud",
-            style = MaterialTheme.typography.h4,
+            style = MaterialTheme.typography.headlineMedium,
             modifier = Modifier.padding(bottom = 32.dp)
         )
         
@@ -104,8 +104,9 @@ fun LoginScreen(
         ) {
             if (isLoading) {
                 CircularProgressIndicator(
-                    color = MaterialTheme.colors.onPrimary,
-                    modifier = Modifier.size(24.dp)
+                    modifier = Modifier.size(24.dp),
+                    color = MaterialTheme.colorScheme.onPrimary,
+                    strokeWidth = 2.dp
                 )
             } else {
                 Text("Login")
@@ -136,7 +137,7 @@ fun LoginScreen(
         authError.value?.let { error ->
             Text(
                 text = error,
-                color = MaterialTheme.colors.error,
+                color = MaterialTheme.colorScheme.error,
                 modifier = Modifier.padding(top = 16.dp)
             )
         }

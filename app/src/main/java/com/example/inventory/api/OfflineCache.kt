@@ -20,6 +20,9 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.TimeUnit
+import com.example.inventory.data.model.PendingOperation
+import com.example.inventory.data.model.OperationType
+import com.example.inventory.data.model.SyncStatus
 
 /**
  * Offline Cache for data persistence when the app is offline
@@ -31,9 +34,9 @@ object OfflineCache {
     private val TAG = "OfflineCache"
     
     // In-memory cache for quick access
-    private val itemCache = ConcurrentHashMap<UUID, Item>()
-    private val staffCache = ConcurrentHashMap<UUID, Staff>()
-    private val checkoutCache = ConcurrentHashMap<UUID, CheckoutLog>()
+    private val itemCache = ConcurrentHashMap<String, Item>()
+    private val staffCache = ConcurrentHashMap<String, Staff>()
+    private val checkoutCache = ConcurrentHashMap<String, CheckoutLog>()
     
     // Pending operations to sync when online
     private val pendingOperations = ConcurrentHashMap<String, PendingOperation>()
@@ -97,27 +100,21 @@ object OfflineCache {
                 preferences[ITEMS_KEY]?.let { itemsJson ->
                     val itemsType = object : TypeToken<Map<String, Item>>() {}.type
                     val loadedItems: Map<String, Item> = gson.fromJson(itemsJson, itemsType)
-                    loadedItems.forEach { (key, item) ->
-                        itemCache[UUID.fromString(key)] = item
-                    }
+                    itemCache.putAll(loadedItems)
                 }
                 
                 // Load staff
                 preferences[STAFF_KEY]?.let { staffJson ->
                     val staffType = object : TypeToken<Map<String, Staff>>() {}.type
                     val loadedStaff: Map<String, Staff> = gson.fromJson(staffJson, staffType)
-                    loadedStaff.forEach { (key, staff) ->
-                        staffCache[UUID.fromString(key)] = staff
-                    }
+                    staffCache.putAll(loadedStaff)
                 }
                 
                 // Load checkouts
                 preferences[CHECKOUTS_KEY]?.let { checkoutsJson ->
                     val checkoutsType = object : TypeToken<Map<String, CheckoutLog>>() {}.type
                     val loadedCheckouts: Map<String, CheckoutLog> = gson.fromJson(checkoutsJson, checkoutsType)
-                    loadedCheckouts.forEach { (key, checkout) ->
-                        checkoutCache[UUID.fromString(key)] = checkout
-                    }
+                    checkoutCache.putAll(loadedCheckouts)
                 }
                 
                 // Load pending operations
@@ -139,15 +136,15 @@ object OfflineCache {
         try {
             context.dataStore.edit { preferences ->
                 // Save items
-                val itemsJson = gson.toJson(itemCache.mapKeys { it.key.toString() })
+                val itemsJson = gson.toJson(itemCache)
                 preferences[ITEMS_KEY] = itemsJson
                 
                 // Save staff
-                val staffJson = gson.toJson(staffCache.mapKeys { it.key.toString() })
+                val staffJson = gson.toJson(staffCache)
                 preferences[STAFF_KEY] = staffJson
                 
                 // Save checkouts
-                val checkoutsJson = gson.toJson(checkoutCache.mapKeys { it.key.toString() })
+                val checkoutsJson = gson.toJson(checkoutCache)
                 preferences[CHECKOUTS_KEY] = checkoutsJson
                 
                 // Save pending operations
@@ -177,23 +174,33 @@ object OfflineCache {
     /**
      * Get cached item by ID
      */
-    fun getCachedItem(id: UUID): Item? = itemCache[id]
+    fun getCachedItem(id: UUID): Item? = itemCache[id.toString()]
     
     /**
      * Get cached staff by ID
      */
-    fun getCachedStaff(id: UUID): Staff? = staffCache[id]
+    fun getCachedStaff(id: UUID): Staff? = staffCache[id.toString()]
     
     /**
      * Get cached checkout by ID
      */
-    fun getCachedCheckout(id: UUID): CheckoutLog? = checkoutCache[id]
+    fun getCachedCheckout(id: UUID): CheckoutLog? = checkoutCache[id.toString()]
     
     /**
      * Cache an item
      */
     suspend fun cacheItem(item: Item, context: Context) {
-        itemCache[item.id] = item
+        itemCache[item.idString] = item
+        saveToPersistentStorage(context)
+    }
+    
+    /**
+     * Cache multiple items
+     */
+    suspend fun cacheItems(items: List<Item>, context: Context) {
+        items.forEach { item ->
+            itemCache[item.idString] = item
+        }
         saveToPersistentStorage(context)
     }
     
@@ -201,39 +208,35 @@ object OfflineCache {
      * Cache a staff member
      */
     suspend fun cacheStaff(staff: Staff, context: Context) {
-        staffCache[staff.id] = staff
+        staffCache[staff.idString] = staff
+        saveToPersistentStorage(context)
+    }
+    
+    /**
+     * Cache multiple staff members
+     */
+    suspend fun cacheStaffList(staffList: List<Staff>, context: Context) {
+        staffList.forEach { staff ->
+            staffCache[staff.idString] = staff
+        }
         saveToPersistentStorage(context)
     }
     
     /**
      * Cache a checkout log
      */
-    suspend fun cacheCheckout(checkout: CheckoutLog, context: Context) {
-        checkoutCache[checkout.id] = checkout
+    suspend fun cacheCheckoutLog(checkout: CheckoutLog, context: Context) {
+        checkoutCache[checkout.idString] = checkout
         saveToPersistentStorage(context)
     }
     
     /**
-     * Cache a batch of items
+     * Cache multiple checkout logs
      */
-    suspend fun cacheItems(items: List<Item>, context: Context) {
-        items.forEach { item -> itemCache[item.id] = item }
-        saveToPersistentStorage(context)
-    }
-    
-    /**
-     * Cache a batch of staff members
-     */
-    suspend fun cacheStaff(staffList: List<Staff>, context: Context) {
-        staffList.forEach { staff -> staffCache[staff.id] = staff }
-        saveToPersistentStorage(context)
-    }
-    
-    /**
-     * Cache a batch of checkout logs
-     */
-    suspend fun cacheCheckouts(checkouts: List<CheckoutLog>, context: Context) {
-        checkouts.forEach { checkout -> checkoutCache[checkout.id] = checkout }
+    suspend fun cacheCheckoutLogs(checkouts: List<CheckoutLog>, context: Context) {
+        checkouts.forEach { checkout ->
+            checkoutCache[checkout.idString] = checkout
+        }
         saveToPersistentStorage(context)
     }
     
@@ -241,22 +244,41 @@ object OfflineCache {
      * Add a pending operation to be synced when online
      */
     suspend fun addPendingOperation(operation: PendingOperation, context: Context) {
-        pendingOperations[operation.id] = operation
+        pendingOperations[operation.id.toString()] = operation
         saveToPersistentStorage(context)
+        
+        // Attempt to sync immediately if online
+        if (SharedViewModel.isCloudConnected.value) {
+            attemptSync(context)
+        }
     }
     
     /**
-     * Get all pending operations
+     * Register a listener for sync status updates
      */
-    fun getPendingOperations(): List<PendingOperation> = pendingOperations.values.toList()
+    fun addSyncListener(listener: (SyncStatus) -> Unit) {
+        syncListeners.add(listener)
+    }
     
     /**
-     * Remove a pending operation once it's been synced
+     * Unregister a sync listener
      */
-    suspend fun removePendingOperation(operationId: String, context: Context) {
-        pendingOperations.remove(operationId)
-        saveToPersistentStorage(context)
+    fun removeSyncListener(listener: (SyncStatus) -> Unit) {
+        syncListeners.remove(listener)
     }
+    
+    /**
+     * Update the sync status and notify listeners
+     */
+    private fun updateSyncStatus(status: SyncStatus) {
+        currentSyncStatus = status
+        syncListeners.forEach { it(status) }
+    }
+    
+    /**
+     * Get the current sync status
+     */
+    fun getCurrentSyncStatus(): SyncStatus = currentSyncStatus
     
     /**
      * Attempt to sync pending operations with the cloud
@@ -277,11 +299,8 @@ object OfflineCache {
         updateSyncStatus(SyncStatus.IN_PROGRESS)
         
         try {
-            // Sort operations by priority (highest first) and then by timestamp
-            val operations = pendingOperations.values
-                .sortedWith(compareByDescending<PendingOperation> { it.priority }
-                    .thenBy { it.timestamp })
-                .toList()
+            // Sort operations by timestamp (oldest first)
+            val operations = pendingOperations.values.toList()
             
             var successCount = 0
             val maxRetries = 3
@@ -291,16 +310,11 @@ object OfflineCache {
                 var success = false
                 
                 while (!success && retryCount < maxRetries) {
-                    success = when (operation.type) {
-                        OperationType.INSERT_ITEM -> syncInsertItem(operation)
-                        OperationType.UPDATE_ITEM -> syncUpdateItem(operation)
-                        OperationType.DELETE_ITEM -> syncDeleteItem(operation)
-                        OperationType.INSERT_STAFF -> syncInsertStaff(operation)
-                        OperationType.UPDATE_STAFF -> syncUpdateStaff(operation)
-                        OperationType.DELETE_STAFF -> syncDeleteStaff(operation)
-                        OperationType.INSERT_CHECKOUT -> syncInsertCheckout(operation)
-                        OperationType.UPDATE_CHECKOUT -> syncUpdateCheckout(operation)
-                        OperationType.CHECK_IN_ITEM -> syncCheckInItem(operation)
+                    success = when (operation.operationType) {
+                        OperationType.CREATE -> syncCreateOperation(operation)
+                        OperationType.UPDATE -> syncUpdateOperation(operation)
+                        OperationType.DELETE -> syncDeleteOperation(operation)
+                        else -> false
                     }
                     
                     if (!success) {
@@ -313,10 +327,10 @@ object OfflineCache {
                 }
                 
                 if (success) {
-                    pendingOperations.remove(operation.id)
+                    pendingOperations.remove(operation.id.toString())
                     successCount++
                 } else {
-                    Log.e(TAG, "Failed to sync operation after $maxRetries retries: ${operation.type}")
+                    Log.e(TAG, "Failed to sync operation after $maxRetries retries: ${operation.operationType}")
                 }
             }
             
@@ -337,212 +351,99 @@ object OfflineCache {
     }
     
     /**
-     * Sync a pending insert item operation
+     * Sync a CREATE operation (for any entity type)
      */
-    private suspend fun syncInsertItem(operation: PendingOperation): Boolean {
+    private suspend fun syncCreateOperation(operation: PendingOperation): Boolean {
         try {
-            val item = gson.fromJson(operation.data, Item::class.java)
-            NetworkModule.itemApiService.createItem(item.toDto())
+            when (operation.collectionName) {
+                "items" -> {
+                    val item = gson.fromJson(operation.data, Item::class.java)
+                    NetworkModule.itemApiService.createItem(item.toNetworkDto())
+                }
+                "staff" -> {
+                    val staff = gson.fromJson(operation.data, Staff::class.java)
+                    NetworkModule.staffApiService.createStaff(staff.toNetworkDto())
+                }
+                "checkouts" -> {
+                    val checkout = gson.fromJson(operation.data, CheckoutLog::class.java)
+                    NetworkModule.checkoutApiService.createCheckoutLog(checkout.toNetworkDto())
+                }
+                else -> return false
+            }
             return true
         } catch (e: Exception) {
-            Log.e(TAG, "Error syncing insert item operation", e)
+            Log.e(TAG, "Error syncing CREATE operation for ${operation.collectionName}", e)
             return false
         }
     }
     
     /**
-     * Sync a pending update item operation
+     * Sync an UPDATE operation (for any entity type)
      */
-    private suspend fun syncUpdateItem(operation: PendingOperation): Boolean {
+    private suspend fun syncUpdateOperation(operation: PendingOperation): Boolean {
         try {
-            val item = gson.fromJson(operation.data, Item::class.java)
-            NetworkModule.itemApiService.updateItem(item.id.toString(), item.toDto())
+            when (operation.collectionName) {
+                "items" -> {
+                    val item = gson.fromJson(operation.data, Item::class.java)
+                    NetworkModule.itemApiService.updateItem(item.idString, item.toNetworkDto())
+                }
+                "staff" -> {
+                    val staff = gson.fromJson(operation.data, Staff::class.java)
+                    NetworkModule.staffApiService.updateStaff(staff.idString, staff.toNetworkDto())
+                }
+                "checkouts" -> {
+                    val checkout = gson.fromJson(operation.data, CheckoutLog::class.java)
+                    NetworkModule.checkoutApiService.createCheckoutLog(checkout.toNetworkDto())
+                }
+                else -> return false
+            }
             return true
         } catch (e: Exception) {
-            Log.e(TAG, "Error syncing update item operation", e)
+            Log.e(TAG, "Error syncing UPDATE operation for ${operation.collectionName}", e)
             return false
         }
     }
     
     /**
-     * Sync a pending delete item operation
+     * Sync a DELETE operation (for any entity type)
      */
-    private suspend fun syncDeleteItem(operation: PendingOperation): Boolean {
+    private suspend fun syncDeleteOperation(operation: PendingOperation): Boolean {
         try {
-            val item = gson.fromJson(operation.data, Item::class.java)
-            NetworkModule.itemApiService.updateItemStatus(item.id.toString(), mapOf("isActive" to "false"))
+            when (operation.collectionName) {
+                "items" -> {
+                    val item = gson.fromJson(operation.data, Item::class.java)
+                    NetworkModule.itemApiService.archiveItem(item.idString)
+                }
+                "staff" -> {
+                    val staff = gson.fromJson(operation.data, Staff::class.java)
+                    NetworkModule.staffApiService.archiveStaff(staff.idString)
+                }
+                "checkouts" -> {
+                    // For checkouts, we don't delete but mark as completed
+                    val checkout = gson.fromJson(operation.data, CheckoutLog::class.java)
+                    NetworkModule.checkoutApiService.checkInItem(checkout.idString, mapOf("status" to "COMPLETE"))
+                }
+                else -> return false
+            }
             return true
         } catch (e: Exception) {
-            Log.e(TAG, "Error syncing delete item operation", e)
+            Log.e(TAG, "Error syncing DELETE operation for ${operation.collectionName}", e)
             return false
-        }
-    }
-    
-    /**
-     * Sync a pending insert staff operation
-     */
-    private suspend fun syncInsertStaff(operation: PendingOperation): Boolean {
-        try {
-            val staff = gson.fromJson(operation.data, Staff::class.java)
-            NetworkModule.staffApiService.createStaff(staff.toDto())
-            return true
-        } catch (e: Exception) {
-            Log.e(TAG, "Error syncing insert staff operation", e)
-            return false
-        }
-    }
-    
-    /**
-     * Sync a pending update staff operation
-     */
-    private suspend fun syncUpdateStaff(operation: PendingOperation): Boolean {
-        try {
-            val staff = gson.fromJson(operation.data, Staff::class.java)
-            NetworkModule.staffApiService.updateStaff(staff.id.toString(), staff.toDto())
-            return true
-        } catch (e: Exception) {
-            Log.e(TAG, "Error syncing update staff operation", e)
-            return false
-        }
-    }
-    
-    /**
-     * Sync a pending delete staff operation
-     */
-    private suspend fun syncDeleteStaff(operation: PendingOperation): Boolean {
-        try {
-            val staff = gson.fromJson(operation.data, Staff::class.java)
-            NetworkModule.staffApiService.archiveStaff(staff.id.toString())
-            return true
-        } catch (e: Exception) {
-            Log.e(TAG, "Error syncing delete staff operation", e)
-            return false
-        }
-    }
-    
-    /**
-     * Sync a pending insert checkout operation
-     */
-    private suspend fun syncInsertCheckout(operation: PendingOperation): Boolean {
-        try {
-            val checkout = gson.fromJson(operation.data, CheckoutLog::class.java)
-            NetworkModule.checkoutApiService.createCheckoutLog(checkout.toDto())
-            return true
-        } catch (e: Exception) {
-            Log.e(TAG, "Error syncing insert checkout operation", e)
-            return false
-        }
-    }
-    
-    /**
-     * Sync a pending update checkout operation
-     */
-    private suspend fun syncUpdateCheckout(operation: PendingOperation): Boolean {
-        try {
-            val checkout = gson.fromJson(operation.data, CheckoutLog::class.java)
-            NetworkModule.checkoutApiService.createCheckoutLog(checkout.toDto())
-            return true
-        } catch (e: Exception) {
-            Log.e(TAG, "Error syncing update checkout operation", e)
-            return false
-        }
-    }
-    
-    /**
-     * Sync a pending check in item operation
-     */
-    private suspend fun syncCheckInItem(operation: PendingOperation): Boolean {
-        try {
-            val checkout = gson.fromJson(operation.data, CheckoutLog::class.java)
-            NetworkModule.checkoutApiService.checkInItem(
-                checkout.id.toString(),
-                mapOf("checkInTime" to checkout.checkInTime.toString())
-            )
-            return true
-        } catch (e: Exception) {
-            Log.e(TAG, "Error syncing check in item operation", e)
-            return false
-        }
-    }
-    
-    /**
-     * Register a sync status listener
-     */
-    fun addSyncListener(listener: (SyncStatus) -> Unit) {
-        syncListeners.add(listener)
-        listener(currentSyncStatus)
-    }
-    
-    /**
-     * Remove a sync status listener
-     */
-    fun removeSyncListener(listener: (SyncStatus) -> Unit) {
-        syncListeners.remove(listener)
-    }
-    
-    /**
-     * Update the sync status and notify listeners
-     */
-    private fun updateSyncStatus(status: SyncStatus) {
-        currentSyncStatus = status
-        syncListeners.forEach { it(status) }
-    }
-    
-    /**
-     * Clear all cached data (typically used for logout)
-     */
-    suspend fun clearCache(context: Context) {
-        itemCache.clear()
-        staffCache.clear()
-        checkoutCache.clear()
-        pendingOperations.clear()
-        saveToPersistentStorage(context)
-    }
-    
-    /**
-     * Shutdown the sync scheduler (typically called in onDestroy)
-     */
-    fun shutdown() {
-        if (::syncScheduler.isInitialized && !syncScheduler.isShutdown) {
-            syncScheduler.shutdown()
         }
     }
 }
 
 /**
- * Pending operation for offline actions
+ * Class representing a pending operation for offline support
  */
-data class PendingOperation(
-    val id: String = UUID.randomUUID().toString(),
-    val type: OperationType,
-    val data: String,  // JSON string of the entity
-    val timestamp: Long = System.currentTimeMillis(),
-    val priority: Int = 0  // Higher number means higher priority
-)
+// This class has been moved to com.example.inventory.data.model.PendingOperation
 
 /**
- * Types of operations that can be performed offline
+ * Types of operations supported for offline caching
  */
-enum class OperationType {
-    INSERT_ITEM,
-    UPDATE_ITEM,
-    DELETE_ITEM,
-    INSERT_STAFF,
-    UPDATE_STAFF,
-    DELETE_STAFF,
-    INSERT_CHECKOUT,
-    UPDATE_CHECKOUT,
-    CHECK_IN_ITEM
-}
+// This enum has been moved to com.example.inventory.data.model.OperationType
 
 /**
- * Sync status enum
+ * Status of a sync operation
  */
-enum class SyncStatus {
-    IDLE,
-    IN_PROGRESS,
-    COMPLETE,
-    PARTIAL,
-    FAILED,
-    OFFLINE
-} 
+// This enum has been moved to com.example.inventory.data.model.SyncStatus 

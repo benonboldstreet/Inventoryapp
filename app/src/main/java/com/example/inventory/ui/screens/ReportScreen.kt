@@ -11,7 +11,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.FileDownload
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Divider
@@ -20,6 +22,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -32,11 +36,15 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.example.inventory.data.database.CheckoutLog
-import com.example.inventory.data.database.Item
-import com.example.inventory.data.database.Staff
+import com.example.inventory.data.model.CheckoutLog
+import com.example.inventory.data.model.Item
+import com.example.inventory.data.model.Staff
+import com.example.inventory.ui.viewmodel.CheckoutViewModel
+import com.example.inventory.ui.viewmodel.ItemViewModel
+import com.example.inventory.ui.viewmodel.StaffViewModel
 import com.example.inventory.ui.viewmodel.checkoutViewModel
 import com.example.inventory.ui.viewmodel.itemViewModel
 import com.example.inventory.ui.viewmodel.staffViewModel
@@ -45,11 +53,17 @@ import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.UUID
 
+/**
+ * A data class to hold the information for checkout reports
+ */
 data class CheckoutReport(
+    val checkoutLog: CheckoutLog,
     val item: Item,
     val staff: Staff,
-    val checkout: CheckoutLog
+    val checkoutDate: String,
+    val checkInDate: String?
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -60,51 +74,51 @@ fun ReportScreen(
     val checkoutViewModel = checkoutViewModel()
     val itemViewModel = itemViewModel()
     val staffViewModel = staffViewModel()
-    
-    var searchQuery by remember { mutableStateOf("") }
-    var currentCheckouts by remember { mutableStateOf<List<CheckoutReport>>(emptyList()) }
-    var recentCheckoutHistory by remember { mutableStateOf<List<CheckoutReport>>(emptyList()) }
-    var selectedTab by remember { mutableStateOf(0) } // 0 for current, 1 for history
     val coroutineScope = rememberCoroutineScope()
     
-    // Load current checkouts and history
-    LaunchedEffect(Unit) {
-        // Load current checkouts
-        loadCheckedOutItems(
-            checkoutViewModel = checkoutViewModel,
-            itemViewModel = itemViewModel,
-            staffViewModel = staffViewModel,
-            onReportsLoaded = { reports -> 
-                currentCheckouts = reports
-            }
-        )
-        
-        // Load recent checkout history (completed checkouts)
-        loadCheckoutHistory(
-            checkoutViewModel = checkoutViewModel,
-            itemViewModel = itemViewModel,
-            staffViewModel = staffViewModel,
-            onHistoryLoaded = { reports ->
-                recentCheckoutHistory = reports
-            }
-        )
-    }
+    var selectedTab by remember { mutableStateOf(0) }
+    var checkoutReports by remember { mutableStateOf<List<CheckoutReport>>(emptyList()) }
     
-    // Filter reports based on search query and selected tab
-    val reportsList = if (selectedTab == 0) currentCheckouts else recentCheckoutHistory
-    val filteredReports = if (searchQuery.isBlank()) {
-        reportsList
-    } else {
-        reportsList.filter { report ->
-            report.item.name.contains(searchQuery, ignoreCase = true) ||
-            report.staff.name.contains(searchQuery, ignoreCase = true)
+    // Fetch active checkouts and generate reports
+    LaunchedEffect(selectedTab) {
+        coroutineScope.launch {
+            val checkoutLogs = when (selectedTab) {
+                0 -> checkoutViewModel.activeCheckouts.first() // Active checkouts
+                1 -> checkoutViewModel.completedCheckouts.first() // Completed checkouts
+                else -> emptyList()
+            }
+            
+            val reports = mutableListOf<CheckoutReport>()
+            
+            for (log in checkoutLogs) {
+                val itemData = itemViewModel.getItemById(log.itemId).first()
+                val staffData = staffViewModel.getStaffById(log.staffId).first()
+                
+                if (itemData != null && staffData != null) {
+                    val dateFormat = SimpleDateFormat("MMM dd, yyyy", Locale.getDefault())
+                    val checkoutDate = dateFormat.format(Date(log.getCheckOutTimeAsLong()))
+                    val checkInDate = log.getCheckInTimeAsLong()?.let { dateFormat.format(Date(it)) }
+                    
+                    reports.add(
+                        CheckoutReport(
+                            checkoutLog = log,
+                            item = itemData,
+                            staff = staffData,
+                            checkoutDate = checkoutDate,
+                            checkInDate = checkInDate
+                        )
+                    )
+                }
+            }
+            
+            checkoutReports = reports
         }
     }
     
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Checkout Reports") }
+                title = { Text("Inventory Reports") }
             )
         },
         bottomBar = bottomBar
@@ -113,104 +127,92 @@ fun ReportScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .padding(horizontal = 16.dp)
+                .padding(16.dp)
         ) {
-            // Search bar
-            OutlinedTextField(
-                value = searchQuery,
-                onValueChange = { searchQuery = it },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 8.dp),
-                placeholder = { Text("Search by item or staff name") },
-                leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search") },
-                singleLine = true
+            Text(
+                text = "Inventory Reports",
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Bold
             )
             
+            Spacer(modifier = Modifier.height(16.dp))
+            
             // Tab selector
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 8.dp)
+            TabRow(
+                selectedTabIndex = selectedTab
             ) {
-                androidx.compose.material3.FilterChip(
+                Tab(
                     selected = selectedTab == 0,
                     onClick = { selectedTab = 0 },
-                    label = { Text("Current Checkouts") },
-                    modifier = Modifier.weight(1f)
+                    text = { Text("Current Checkouts") }
                 )
-                
-                Spacer(modifier = Modifier.width(8.dp))
-                
-                androidx.compose.material3.FilterChip(
+                Tab(
                     selected = selectedTab == 1,
                     onClick = { selectedTab = 1 },
-                    label = { Text("Checkout History") },
-                    modifier = Modifier.weight(1f)
+                    text = { Text("Checkout History") }
                 )
             }
             
-            // Header with summary stats
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 8.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f)
-                )
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            // Export button
+            Button(
+                onClick = { /* TODO: Implement export functionality */ },
+                modifier = Modifier.align(Alignment.End)
             ) {
+                Icon(
+                    imageVector = Icons.Default.FileDownload,
+                    contentDescription = "Export"
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Text("Export Report")
+            }
+            
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            if (checkoutReports.isEmpty()) {
+                // Show empty state
                 Column(
-                    modifier = Modifier.padding(16.dp)
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 32.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
+                    Icon(
+                        imageVector = Icons.Default.CalendarMonth,
+                        contentDescription = null,
+                        modifier = Modifier.height(48.dp),
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                    
+                    Spacer(modifier = Modifier.height(16.dp))
+                    
                     Text(
-                        text = if (selectedTab == 0) "Current Checkouts" else "Checkout History",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
+                        text = when (selectedTab) {
+                            0 -> "No active checkouts"
+                            1 -> "No checkout history"
+                            else -> "No data available"
+                        },
+                        style = MaterialTheme.typography.titleLarge
                     )
                     
                     Spacer(modifier = Modifier.height(8.dp))
                     
                     Text(
-                        text = "Total Items: ${reportsList.size}",
-                        style = MaterialTheme.typography.bodyLarge
+                        text = when (selectedTab) {
+                            0 -> "All items are currently available"
+                            1 -> "No items have been checked out yet"
+                            else -> "Please try again later"
+                        },
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                    
-                    if (searchQuery.isNotBlank()) {
-                        Text(
-                            text = "Search Results: ${filteredReports.size}",
-                            style = MaterialTheme.typography.bodyLarge
-                        )
-                    }
                 }
-            }
-            
-            // List of items
-            if (filteredReports.isEmpty()) {
-                Text(
-                    text = if (reportsList.isEmpty()) 
-                        if (selectedTab == 0) "No items are currently checked out." else "No checkout history available."
-                    else 
-                        "No items match your search.",
-                    style = MaterialTheme.typography.bodyLarge,
-                    modifier = Modifier.padding(vertical = 16.dp)
-                )
             } else {
-                LazyColumn(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 8.dp)
-                ) {
-                    items(filteredReports) { report ->
-                        if (selectedTab == 0) {
-                            // Current checkouts without check-in button
-                            CheckoutReportCard(
-                                report = report,
-                                onCheckIn = {} // Empty callback as we're making it view-only
-                            )
-                        } else {
-                            // Checkout history with timestamps
-                            CheckoutHistoryCard(report = report)
-                        }
+                // Show report list
+                LazyColumn {
+                    items(checkoutReports) { report ->
+                        ReportCard(report = report)
                         Spacer(modifier = Modifier.height(8.dp))
                     }
                 }
@@ -219,195 +221,79 @@ fun ReportScreen(
     }
 }
 
-private suspend fun loadCheckedOutItems(
-    checkoutViewModel: com.example.inventory.ui.viewmodel.CheckoutViewModel,
-    itemViewModel: com.example.inventory.ui.viewmodel.ItemViewModel,
-    staffViewModel: com.example.inventory.ui.viewmodel.StaffViewModel,
-    onReportsLoaded: (List<CheckoutReport>) -> Unit
-) {
-    // Get current checkouts
-    val checkouts = checkoutViewModel.currentCheckouts.first()
-    
-    // Build reports with item and staff details
-    val reports = mutableListOf<CheckoutReport>()
-    for (checkout in checkouts) {
-        val item = itemViewModel.getItemById(checkout.itemId)
-        val staff = staffViewModel.getStaffById(checkout.staffId)
-        
-        if (item != null && staff != null) {
-            reports.add(CheckoutReport(item = item, staff = staff, checkout = checkout))
-        }
-    }
-    
-    onReportsLoaded(reports)
-}
-
-private suspend fun loadCheckoutHistory(
-    checkoutViewModel: com.example.inventory.ui.viewmodel.CheckoutViewModel,
-    itemViewModel: com.example.inventory.ui.viewmodel.ItemViewModel,
-    staffViewModel: com.example.inventory.ui.viewmodel.StaffViewModel,
-    onHistoryLoaded: (List<CheckoutReport>) -> Unit
-) {
-    // Get all checkout logs
-    val allLogs = checkoutViewModel.allCheckoutLogs.first()
-    
-    // Filter for completed checkouts (those with checkInTime not null)
-    val completedCheckouts = allLogs.filter { it.checkInTime != null }
-        .sortedByDescending { it.checkInTime } // Most recent check-ins first
-    
-    // Build reports with item and staff details
-    val reports = mutableListOf<CheckoutReport>()
-    for (checkout in completedCheckouts) {
-        val item = itemViewModel.getItemById(checkout.itemId)
-        val staff = staffViewModel.getStaffById(checkout.staffId)
-        
-        if (item != null && staff != null) {
-            reports.add(CheckoutReport(item = item, staff = staff, checkout = checkout))
-        }
-    }
-    
-    onHistoryLoaded(reports)
-}
-
 @Composable
-fun CheckoutReportCard(
-    report: CheckoutReport,
-    onCheckIn: () -> Unit
-) {
+fun ReportCard(report: CheckoutReport) {
     Card(
-        modifier = Modifier
-            .fillMaxWidth(),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        modifier = Modifier.fillMaxWidth()
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp)
+            modifier = Modifier.padding(16.dp)
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Item type and name
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = report.item.name,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-                    
-                    Text(
-                        text = "Type: ${report.item.type}",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                }
-                
-                // Checkout date
-                Text(
-                    text = formatDateShort(report.checkout.checkOutTime),
-                    style = MaterialTheme.typography.bodySmall,
-                    modifier = Modifier.align(Alignment.Top)
-                )
-            }
-            
-            Divider(modifier = Modifier.padding(vertical = 8.dp))
-            
-            // Staff info without check-in button
-            Column(modifier = Modifier.fillMaxWidth()) {
-                Text(
-                    text = "Assigned to: ${report.staff.name}",
-                    style = MaterialTheme.typography.bodyMedium
-                )
-                
-                Text(
-                    text = "Department: ${report.staff.department}",
-                    style = MaterialTheme.typography.bodySmall
-                )
-            }
-        }
-    }
-}
-
-@Composable
-fun CheckoutHistoryCard(
-    report: CheckoutReport
-) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth(),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp)
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Item type and name
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = report.item.name,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-                    
-                    Text(
-                        text = "Type: ${report.item.type}",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                }
-            }
-            
-            Divider(modifier = Modifier.padding(vertical = 8.dp))
+            // Item information
+            Text(
+                text = report.item.name,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
             
             Text(
-                text = "Staff: ${report.staff.name}",
+                text = "Category: ${report.item.category}",
+                style = MaterialTheme.typography.bodyMedium
+            )
+            
+            Divider(modifier = Modifier.padding(vertical = 8.dp))
+            
+            // Staff information
+            Text(
+                text = "Checked out by: ${report.staff.name}",
                 style = MaterialTheme.typography.bodyMedium
             )
             
             Text(
                 text = "Department: ${report.staff.department}",
-                style = MaterialTheme.typography.bodySmall
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             
-            Spacer(modifier = Modifier.height(8.dp))
+            Divider(modifier = Modifier.padding(vertical = 8.dp))
             
-            // Checkout and checkin timestamps
-            val dateFormat = SimpleDateFormat("MMM dd, yyyy 'at' hh:mm a", Locale.getDefault())
-            
-            Text(
-                text = "Checked out: ${dateFormat.format(Date(report.checkout.checkOutTime))}",
-                style = MaterialTheme.typography.bodyMedium
-            )
-            
-            report.checkout.checkInTime?.let { checkInTime ->
+            // Checkout dates
+            Row(
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Text(
-                    text = "Checked in: ${dateFormat.format(Date(checkInTime))}",
+                    text = "Checkout date: ",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.primary,
                     fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = report.checkoutDate,
+                    style = MaterialTheme.typography.bodyMedium
                 )
             }
             
-            // Calculate duration if checked in
-            report.checkout.checkInTime?.let { checkInTime ->
-                val durationMillis = checkInTime - report.checkout.checkOutTime
-                val hours = durationMillis / (1000 * 60 * 60)
-                val minutes = (durationMillis % (1000 * 60 * 60)) / (1000 * 60)
-                
+            if (report.checkInDate != null) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Return date: ",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = report.checkInDate,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color.Green
+                    )
+                }
+            } else {
                 Text(
-                    text = "Duration: ${hours}h ${minutes}m",
+                    text = "Status: Currently checked out",
                     style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Medium
+                    color = MaterialTheme.colorScheme.primary
                 )
             }
         }
     }
-}
-
-@Composable
-private fun formatDateShort(timestamp: Long): String {
-    val dateFormat = SimpleDateFormat("MMM dd, HH:mm", Locale.getDefault())
-    return dateFormat.format(Date(timestamp))
 } 

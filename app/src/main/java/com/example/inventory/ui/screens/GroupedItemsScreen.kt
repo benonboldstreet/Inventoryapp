@@ -45,7 +45,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.inventory.data.database.Item
+import com.example.inventory.data.model.Item
 import com.example.inventory.ui.components.StatusIndicator
 import com.example.inventory.ui.components.getStatusColor
 import com.example.inventory.ui.viewmodel.itemViewModel
@@ -60,6 +60,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.FilterChip
 import java.util.UUID
+import com.example.inventory.ui.viewmodel.SharedViewModel
 
 // Enum for item filtering
 enum class CategoryItemFilter {
@@ -81,6 +82,19 @@ fun GroupedItemsScreen(
     var itemFilter by remember { mutableStateOf(CategoryItemFilter.ACTIVE) }
     
     val coroutineScope = rememberCoroutineScope()
+    
+    // Get the showArchivedItems flag from SharedViewModel
+    val showArchivedItems by SharedViewModel.showArchivedItems.collectAsState()
+    
+    // React to showArchivedItems changes
+    LaunchedEffect(showArchivedItems) {
+        if (showArchivedItems) {
+            // Switch to archived items filter
+            itemFilter = CategoryItemFilter.ARCHIVED
+            // Reset the flag after we've used it
+            SharedViewModel.setShowArchivedItems(false)
+        }
+    }
     
     // Collect items with error handling
     LaunchedEffect(key1 = viewModel) {
@@ -311,6 +325,7 @@ fun CategoryHeader(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ItemCardCompact(
     item: Item,
@@ -330,9 +345,11 @@ fun ItemCardCompact(
     LaunchedEffect(itemState) {
         if (itemState.status == "Checked Out") {
             try {
-                val checkout = checkoutViewModel.getCurrentCheckoutForItem(itemState.id)
+                // First collect the Flow to get the checkout
+                val checkout = checkoutViewModel.getCurrentCheckoutForItem(itemState.id).first()
                 if (checkout != null) {
-                    val staff = staffViewModel.getStaffById(checkout.staffId)
+                    // Then collect the Flow to get the staff
+                    val staff = staffViewModel.getStaffById(checkout.staffId).first()
                     checkedOutToName = staff?.name
                 }
             } catch (e: Exception) {

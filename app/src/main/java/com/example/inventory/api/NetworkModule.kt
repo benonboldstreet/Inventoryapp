@@ -59,8 +59,8 @@ data class CheckoutLogDto(
 /**
  * Extension functions to convert between DTOs and domain models
  */
-fun ItemDto.toEntity(): Item = Item(
-    id = id?.let { UUID.fromString(it) } ?: UUID.randomUUID(),
+fun ItemDto.toModel(): Item = Item(
+    idString = id ?: UUID.randomUUID().toString(),
     name = name,
     category = category,
     type = type,
@@ -69,11 +69,11 @@ fun ItemDto.toEntity(): Item = Item(
     status = status,
     photoPath = photoPath,
     isActive = isActive,
-    lastModified = lastModified
+    lastModified = lastModified ?: System.currentTimeMillis()
 )
 
-fun Item.toDto(): ItemDto = ItemDto(
-    id = id.toString(),
+fun Item.toNetworkDto(): ItemDto = ItemDto(
+    id = idString,
     name = name,
     category = category,
     type = type,
@@ -82,49 +82,49 @@ fun Item.toDto(): ItemDto = ItemDto(
     status = status,
     photoPath = photoPath,
     isActive = isActive,
-    lastModified = lastModified
+    lastModified = getLastModifiedTime()
 )
 
-fun StaffDto.toEntity(): Staff = Staff(
-    id = id?.let { UUID.fromString(it) } ?: UUID.randomUUID(),
+fun StaffDto.toModel(): Staff = Staff(
+    idString = id ?: UUID.randomUUID().toString(),
     name = name,
     department = department,
     email = email,
     phone = phone,
     position = position,
     isActive = isActive,
-    lastModified = lastModified
+    lastModified = lastModified ?: System.currentTimeMillis()
 )
 
-fun Staff.toDto(): StaffDto = StaffDto(
-    id = id.toString(),
+fun Staff.toNetworkDto(): StaffDto = StaffDto(
+    id = idString,
     name = name,
     department = department,
     email = email,
     phone = phone,
     position = position,
     isActive = isActive,
-    lastModified = lastModified
+    lastModified = getLastModifiedTime()
 )
 
-fun CheckoutLogDto.toEntity(): CheckoutLog = CheckoutLog(
-    id = id?.let { UUID.fromString(it) } ?: UUID.randomUUID(),
-    itemId = UUID.fromString(itemId),
-    staffId = UUID.fromString(staffId),
+fun CheckoutLogDto.toModel(): CheckoutLog = CheckoutLog(
+    idString = id ?: UUID.randomUUID().toString(),
+    itemIdString = itemId,
+    staffIdString = staffId,
     checkOutTime = checkOutTime ?: System.currentTimeMillis(),
     checkInTime = checkInTime,
     photoPath = photoPath,
-    lastModified = lastModified
+    lastModified = lastModified ?: System.currentTimeMillis()
 )
 
-fun CheckoutLog.toDto(): CheckoutLogDto = CheckoutLogDto(
-    id = id.toString(),
-    itemId = itemId.toString(),
-    staffId = staffId.toString(),
-    checkOutTime = checkOutTime,
-    checkInTime = checkInTime,
+fun CheckoutLog.toNetworkDto(): CheckoutLogDto = CheckoutLogDto(
+    id = idString,
+    itemId = itemIdString,
+    staffId = staffIdString,
+    checkOutTime = getCheckOutTimeAsLong(),
+    checkInTime = getCheckInTimeAsLong(),
     photoPath = photoPath,
-    lastModified = lastModified
+    lastModified = getLastModifiedTime()
 )
 
 /**

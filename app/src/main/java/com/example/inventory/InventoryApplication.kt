@@ -17,13 +17,14 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import com.example.inventory.api.NetworkModule
+import com.google.firebase.FirebaseApp
 
 /**
- * Inventory Cloud Application
+ * Inventory Application
  * 
- * This application connects to Azure cloud services for all data operations.
- * All inventory items, staff data, and checkout logs are stored in the cloud.
- * Supports offline operation with data caching and synchronization.
+ * This application connects to Firebase Firestore for all data operations.
+ * All inventory items, staff data, and checkout logs are stored in Firestore.
+ * Supports offline operation with data caching.
  */
 class InventoryApplication : Application(), LifecycleObserver {
     
@@ -36,13 +37,10 @@ class InventoryApplication : Application(), LifecycleObserver {
     override fun onCreate() {
         super.onCreate()
         
-        // Initialize NetworkModule with mock services for testing
-        NetworkModule.initWithMockServices(this)
+        // Initialize Firebase
+        FirebaseApp.initializeApp(this)
         
-        // Initialize the AuthNetworkModule
-        AuthNetworkModule.initialize(this)
-        
-        // Initialize the AppContainer with cloud repositories
+        // Initialize the AppContainer with Firebase repositories
         container = AppContainerImpl(this)
         
         // Initialize the offline cache
@@ -56,8 +54,8 @@ class InventoryApplication : Application(), LifecycleObserver {
         // Register as lifecycle observer for application lifecycle events
         ProcessLifecycleOwner.get().lifecycle.addObserver(this)
         
-        // Log that we're running in cloud mode with offline support
-        Log.i("InventoryApp", "Starting in CLOUD MODE with OFFLINE SUPPORT - Connected to Azure backend")
+        // Log that we're running with Firebase Firestore
+        Log.i("InventoryApp", "Starting with FIREBASE FIRESTORE - Includes offline support")
     }
     
     /**
@@ -66,7 +64,7 @@ class InventoryApplication : Application(), LifecycleObserver {
     override fun onTerminate() {
         super.onTerminate()
         // Shutdown any background processes
-        OfflineCache.shutdown()
+        // No shutdown method in OfflineCache anymore, so nothing to do here
     }
     
     /**

@@ -33,8 +33,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
-import com.example.inventory.data.database.Item
-import com.example.inventory.data.database.Staff
+import com.example.inventory.R
+import com.example.inventory.data.model.Item
+import com.example.inventory.data.model.Staff
+import com.example.inventory.ui.viewmodel.CheckoutViewModel
 
 /**
  * Dialog for checking out an item to a staff member

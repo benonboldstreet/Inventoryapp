@@ -31,7 +31,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.example.inventory.data.database.CheckoutLog
+import com.example.inventory.data.model.CheckoutLog
 import com.example.inventory.ui.viewmodel.CheckoutViewModel
 import com.example.inventory.ui.viewmodel.ItemViewModel
 import com.example.inventory.ui.viewmodel.StaffViewModel
@@ -41,6 +41,7 @@ import com.example.inventory.ui.viewmodel.staffViewModel
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.UUID
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -52,7 +53,7 @@ fun CheckoutScreen(
     val itemViewModel = itemViewModel()
     val staffViewModel = staffViewModel()
     
-    val currentCheckouts by checkoutViewModel.currentCheckouts.collectAsState(initial = emptyList())
+    val currentCheckouts by checkoutViewModel.activeCheckouts.collectAsState(initial = emptyList())
     val coroutineScope = rememberCoroutineScope()
     
     Scaffold(
@@ -109,14 +110,18 @@ fun CheckoutCard(
     var itemName by remember { mutableStateOf("") }
     var staffName by remember { mutableStateOf("") }
     
-    // Use LaunchedEffect instead of directly launching a coroutine in composition
     LaunchedEffect(checkout) {
-        launch {
-            val item = itemViewModel.getItemById(checkout.itemId)
-            val staff = staffViewModel.getStaffById(checkout.staffId)
+        coroutineScope.launch {
+            val itemIdUuid = checkout.itemId
+            val staffIdUuid = checkout.staffId
             
-            item?.let { itemName = it.name }
-            staff?.let { staffName = it.name }
+            itemViewModel.getItemById(itemIdUuid).collect { item ->
+                item?.let { itemName = it.name }
+            }
+            
+            staffViewModel.getStaffById(staffIdUuid).collect { staff ->
+                staff?.let { staffName = it.name }
+            }
         }
     }
     
@@ -138,7 +143,7 @@ fun CheckoutCard(
             
             Row {
                 Text("Checked Out: ", fontWeight = FontWeight.Bold)
-                Text(formatTimestamp(checkout.checkOutTime))
+                Text(formatTimestamp(checkout.getCheckOutTimeAsLong()))
             }
             
             Spacer(modifier = Modifier.height(8.dp))

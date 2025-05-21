@@ -3,45 +3,37 @@ package com.example.inventory.ui.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import com.example.inventory.data.database.Staff
+import com.example.inventory.data.model.Staff
 import com.example.inventory.data.repository.StaffRepository
+import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
 import java.util.UUID
+import javax.inject.Inject
 
-class StaffViewModel(private val repository: StaffRepository) : ViewModel() {
+@HiltViewModel
+class StaffViewModel @Inject constructor(
+    private val staffRepository: StaffRepository
+) : ViewModel() {
 
-    // Get all staff as a Flow
-    val allStaff: Flow<List<Staff>> = repository.getAllStaff()
+    // Direct access to repository - no mapping needed since we're using model objects
+    val allStaff: Flow<List<Staff>> = staffRepository.getAllStaff()
     
     /**
      * Get staff by department
      */
     fun getStaffByDepartment(department: String): Flow<List<Staff>> = 
-        repository.getStaffByDepartment(department)
+        staffRepository.getStaffByDepartment(department)
     
     /**
      * Add a new staff record
      * 
      * [CLOUD ENDPOINT - CREATE] Creates a new staff member with name, department, and optional contact details
-     * Should be migrated to create staff records in cloud storage
      */
-    fun addStaff(
-        name: String, 
-        department: String, 
-        email: String = "", 
-        phone: String = "", 
-        position: String = ""
-    ) {
-        val newStaff = Staff(
-            name = name,
-            department = department,
-            email = email,
-            phone = phone,
-            position = position
-        )
+    fun addStaff(staff: Staff) {
         viewModelScope.launch {
-            repository.insertStaff(newStaff)
+            staffRepository.insertStaff(staff)
         }
     }
     
@@ -49,11 +41,10 @@ class StaffViewModel(private val repository: StaffRepository) : ViewModel() {
      * Update an existing staff record
      * 
      * [CLOUD ENDPOINT - UPDATE] Modifies all properties of an existing staff record
-     * Should be migrated to update staff records in cloud storage
      */
     fun updateStaff(staff: Staff) {
         viewModelScope.launch {
-            repository.updateStaff(staff)
+            staffRepository.updateStaff(staff)
         }
     }
     
@@ -61,11 +52,10 @@ class StaffViewModel(private val repository: StaffRepository) : ViewModel() {
      * Delete a staff record
      * 
      * [CLOUD ENDPOINT - DELETE] Permanently removes a staff record from the database
-     * Should be migrated to delete staff records in cloud storage
      */
     fun deleteStaff(staff: Staff) {
         viewModelScope.launch {
-            repository.deleteStaff(staff)
+            staffRepository.deleteStaff(staff)
         }
     }
     
@@ -73,43 +63,90 @@ class StaffViewModel(private val repository: StaffRepository) : ViewModel() {
      * Archive a staff member (mark as inactive) instead of deleting
      * 
      * [CLOUD ENDPOINT - UPDATE] Soft-delete by setting isActive=false on a staff record
-     * Should be migrated to update staff status in cloud storage
      */
     fun archiveStaff(staff: Staff) {
-        val archivedStaff = staff.copy(isActive = false, lastModified = System.currentTimeMillis())
         viewModelScope.launch {
-            repository.updateStaff(archivedStaff)
+            val updatedStaff = staff.copy(
+                isActive = false,
+                lastModified = System.currentTimeMillis()
+            )
+            staffRepository.updateStaff(updatedStaff)
+        }
+    }
+    
+    /**
+     * Restore an archived staff member
+     */
+    fun restoreStaff(staff: Staff) {
+        viewModelScope.launch {
+            val updatedStaff = staff.copy(
+                isActive = true,
+                lastModified = System.currentTimeMillis()
+            )
+            staffRepository.updateStaff(updatedStaff)
+        }
+    }
+    
+    /**
+     * Unarchive a staff member (same as restore)
+     */
+    fun unarchiveStaff(staff: Staff) {
+        viewModelScope.launch {
+            val updatedStaff = staff.copy(
+                isActive = true,
+                lastModified = System.currentTimeMillis()
+            )
+            staffRepository.updateStaff(updatedStaff)
         }
     }
     
     /**
      * Get staff by ID
      */
-    suspend fun getStaffById(id: UUID): Staff? = repository.getStaffById(id)
+    fun getStaffById(id: UUID): Flow<Staff?> = flow {
+        val staff = staffRepository.getStaffById(id)
+        emit(staff)
+    }
+    
+    /**
+     * Get staff by ID (suspend function for direct access)
+     */
+    suspend fun getStaffByIdSuspend(id: UUID): Staff? = staffRepository.getStaffById(id)
     
     /**
      * Update staff department
      * 
      * [CLOUD ENDPOINT - UPDATE] Changes only the department field of a staff record
-     * Should be migrated to update staff department in cloud storage
      */
     fun updateStaffDepartment(staff: Staff, newDepartment: String) {
         val updatedStaff = staff.copy(department = newDepartment)
         viewModelScope.launch {
-            repository.updateStaff(updatedStaff)
+            staffRepository.updateStaff(updatedStaff)
         }
     }
     
     /**
-     * Factory for creating StaffViewModel with dependency injection
+     * Update staff contact information
      */
-    class Factory(private val repository: StaffRepository) : ViewModelProvider.Factory {
-        @Suppress("UNCHECKED_CAST")
-        override fun <T : ViewModel> create(modelClass: Class<T>): T {
-            if (modelClass.isAssignableFrom(StaffViewModel::class.java)) {
-                return StaffViewModel(repository) as T
+    fun updateStaffContact(staff: Staff, phone: String, email: String) {
+        val updatedStaff = staff.copy(phone = phone, email = email)
+        viewModelScope.launch {
+            staffRepository.updateStaff(updatedStaff)
+        }
+    }
+    
+    /**
+     * Factory for creating StaffViewModel instances with dependencies
+     */
+    companion object {
+        class Factory(private val staffRepository: StaffRepository) : ViewModelProvider.Factory {
+            @Suppress("UNCHECKED_CAST")
+            override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                if (modelClass.isAssignableFrom(StaffViewModel::class.java)) {
+                    return StaffViewModel(staffRepository) as T
+                }
+                throw IllegalArgumentException("Unknown ViewModel class")
             }
-            throw IllegalArgumentException("Unknown ViewModel class")
         }
     }
 } 

@@ -1,4 +1,17 @@
 <resources>
     <string name="app_name">Inventory Cloud</string>
     <string name="app_version">v2.0.0 - Cloud Mode</string>
+    <string name="cloud_sync_explanation">
+        <b>How Cloud Synchronization Works:</b>\n\n
+        
+        1. <b>Online Mode:</b> When connected to the internet, all changes are immediately synchronized with the Firebase Firestore database.\n\n
+        
+        2. <b>Offline Mode:</b> When offline, changes are stored locally in the OfflineCache, and a PendingOperation is created to track what needs to be synced when online again.\n\n
+        
+        3. <b>Automatic Synchronization:</b> When the app detects an internet connection after being offline, it automatically processes all pending operations in the background.\n\n
+        
+        4. <b>Connection Indicator:</b> The cloud status icon in the top right of the screen shows if you\'re currently connected (cloud with checkmark) or disconnected (cloud with line through it).\n\n
+        
+        5. <b>Manual Sync:</b> You can tap the cloud icon when disconnected to attempt to reconnect and sync changes.
+    </string>
 </resources>

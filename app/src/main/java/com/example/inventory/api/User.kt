@@ -1,5 +1,12 @@
 package com.example.inventory.api
 
+// This file is now deprecated.
+// Use com.example.inventory.data.model.User and com.example.inventory.data.model.UserRole instead
+// 
+// To avoid breaking existing code, this import statement provides backward compatibility
+// while the migration is in progress
+import com.example.inventory.data.model.User
+import com.example.inventory.data.model.UserRole
 import java.util.UUID
 
 /**

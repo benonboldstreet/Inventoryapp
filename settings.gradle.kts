@@ -12,12 +12,6 @@ dependencyResolutionManagement {
         google()
         mavenCentral()
     }
-    versionCatalogs {
-        create("libs") {
-            version("kotlin", "1.8.21")
-            version("agp", "8.1.4")
-        }
-    }
 }
 
 rootProject.name = "Inventory"

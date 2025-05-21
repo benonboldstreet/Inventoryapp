@@ -1,5 +1,11 @@
 package com.example.inventory.api
 
+// This file is now deprecated.
+// Use com.example.inventory.data.model.OperationType instead
+// 
+// To avoid breaking existing code, this import statement provides backward compatibility
+import com.example.inventory.data.model.OperationType
+
 /**
  * Types of operations that can be pending sync with the cloud
  */

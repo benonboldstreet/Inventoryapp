@@ -1,8 +1,8 @@
 package com.example.inventory.api
 
-import com.example.inventory.data.database.CheckoutLog
-import com.example.inventory.data.database.Item
-import com.example.inventory.data.database.Staff
+import com.example.inventory.data.model.CheckoutLog
+import com.example.inventory.data.model.Item
+import com.example.inventory.data.model.Staff
 import com.example.inventory.data.repository.CheckoutRepository
 import com.example.inventory.data.repository.ItemRepository
 import com.example.inventory.data.repository.StaffRepository
@@ -50,7 +50,7 @@ class SyncController(
                         itemRepository.insertItem(newItem)
                     } else {
                         // Existing item, check last modified timestamp for conflict resolution
-                        val existingLastModified = existingItem.lastModified ?: 0
+                        val existingLastModified = existingItem.getLastModifiedTime()
                         val incomingLastModified = itemDto.lastModified?.let { 
                             Instant.from(DateTimeFormatter.ISO_INSTANT.parse(it)).toEpochMilli()
                         } ?: 0
@@ -87,7 +87,7 @@ class SyncController(
                         staffRepository.insertStaff(newStaff)
                     } else {
                         // Existing staff, check last modified timestamp for conflict resolution
-                        val existingLastModified = existingStaff.lastModified ?: 0
+                        val existingLastModified = existingStaff.getLastModifiedTime()
                         val incomingLastModified = staffDto.lastModified?.let { 
                             Instant.from(DateTimeFormatter.ISO_INSTANT.parse(it)).toEpochMilli()
                         } ?: 0
@@ -124,7 +124,7 @@ class SyncController(
                         checkoutRepository.insertCheckoutLog(newLog)
                     } else {
                         // Existing log, check last modified timestamp for conflict resolution
-                        val existingLastModified = existingLog.lastModified ?: 0
+                        val existingLastModified = existingLog.getLastModifiedTime()
                         val incomingLastModified = logDto.lastModified?.let { 
                             Instant.from(DateTimeFormatter.ISO_INSTANT.parse(it)).toEpochMilli()
                         } ?: 0
@@ -188,11 +188,11 @@ class SyncController(
         condition = condition,
         status = status,
         photoPath = photoPath,
-        lastModified = lastModified?.let { Instant.ofEpochMilli(it).toString() }
+        lastModified = getLastModifiedTime().let { Instant.ofEpochMilli(it).toString() }
     )
     
     private fun ItemDto.toItem(): Item = Item(
-        id = id,
+        idString = id.toString(),
         name = name,
         category = category,
         type = type,
@@ -201,7 +201,7 @@ class SyncController(
         status = status,
         photoPath = photoPath,
         lastModified = lastModified?.let { 
-            Instant.from(DateTimeFormatter.ISO_INSTANT.parse(it)).toEpochMilli() 
+            Instant.from(DateTimeFormatter.ISO_INSTANT.parse(it)).toEpochMilli()
         } ?: System.currentTimeMillis()
     )
     
@@ -212,18 +212,18 @@ class SyncController(
         email = email,
         phone = phone,
         position = position,
-        lastModified = lastModified?.let { Instant.ofEpochMilli(it).toString() }
+        lastModified = getLastModifiedTime().let { Instant.ofEpochMilli(it).toString() }
     )
     
     private fun StaffDto.toStaff(): Staff = Staff(
-        id = id,
+        idString = id.toString(),
         name = name,
         department = department,
         email = email,
         phone = phone,
         position = position,
         lastModified = lastModified?.let { 
-            Instant.from(DateTimeFormatter.ISO_INSTANT.parse(it)).toEpochMilli() 
+            Instant.from(DateTimeFormatter.ISO_INSTANT.parse(it)).toEpochMilli()
         } ?: System.currentTimeMillis()
     )
     
@@ -231,21 +231,21 @@ class SyncController(
         id = id,
         itemId = itemId,
         staffId = staffId,
-        checkOutTime = Instant.ofEpochMilli(checkOutTime).toString(),
-        checkInTime = checkInTime?.let { Instant.ofEpochMilli(it).toString() },
-        lastModified = lastModified?.let { Instant.ofEpochMilli(it).toString() }
+        checkOutTime = Instant.ofEpochMilli(getCheckOutTimeAsLong()).toString(),
+        checkInTime = getCheckInTimeAsLong()?.let { Instant.ofEpochMilli(it).toString() },
+        lastModified = getLastModifiedTime().let { Instant.ofEpochMilli(it).toString() }
     )
     
     private fun CheckoutLogDto.toCheckoutLog(): CheckoutLog = CheckoutLog(
-        id = id,
-        itemId = itemId,
-        staffId = staffId,
+        idString = id.toString(),
+        itemIdString = itemId.toString(),
+        staffIdString = staffId.toString(),
         checkOutTime = Instant.from(DateTimeFormatter.ISO_INSTANT.parse(checkOutTime)).toEpochMilli(),
         checkInTime = checkInTime?.let { 
             Instant.from(DateTimeFormatter.ISO_INSTANT.parse(it)).toEpochMilli() 
         },
         lastModified = lastModified?.let { 
-            Instant.from(DateTimeFormatter.ISO_INSTANT.parse(it)).toEpochMilli() 
+            Instant.from(DateTimeFormatter.ISO_INSTANT.parse(it)).toEpochMilli()
         } ?: System.currentTimeMillis()
     )
 } 
