@@ -27,6 +27,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -50,6 +51,9 @@ import androidx.compose.material3.ListItem
 import androidx.compose.ui.unit.sp
 import androidx.compose.material3.FilterChipDefaults
 import java.util.UUID
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
+import androidx.compose.runtime.rememberCoroutineScope
 
 enum class StaffFilter {
     ALL, ACTIVE, ARCHIVED
@@ -62,7 +66,31 @@ fun StaffListScreen(
     onStaffClick: (Staff) -> Unit = {}
 ) {
     val viewModel = staffViewModel()
-    val staffList by viewModel.allStaff.collectAsState(initial = emptyList())
+    val coroutineScope = rememberCoroutineScope()
+    
+    // Add states for error handling and loading
+    var isLoading by remember { mutableStateOf(true) }
+    var error by remember { mutableStateOf<String?>(null) }
+    var staffList by remember { mutableStateOf<List<Staff>>(emptyList()) }
+    
+    // Use LaunchedEffect to safely collect the Flow
+    LaunchedEffect(viewModel) {
+        try {
+            // Set up a periodic refresh
+            while (true) {
+                viewModel.allStaff.collect { list ->
+                    staffList = list
+                    isLoading = false
+                }
+                // After collection completes, wait a bit and collect again
+                kotlinx.coroutines.delay(3000) // Refresh every 3 seconds
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("StaffListScreen", "Error loading staff data: ${e.message}", e)
+            error = "Error loading staff data: ${e.message}"
+            isLoading = false
+        }
+    }
     
     var showAddStaffDialog by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
@@ -105,7 +133,16 @@ fun StaffListScreen(
             StaffAddDialog(
                 onDismiss = { showAddStaffDialog = false },
                 onConfirm = { staff ->
+                    // Add staff to repository
                     viewModel.addStaff(staff)
+                    
+                    // Force a UI refresh after a slight delay to allow Firebase to update
+                    coroutineScope.launch {
+                        kotlinx.coroutines.delay(500)
+                        // Force reload by triggering the LaunchedEffect again
+                        isLoading = true
+                    }
+                    
                     showAddStaffDialog = false
                 }
             )
@@ -158,7 +195,36 @@ fun StaffListScreen(
                 )
             }
             
-            if (filteredStaffList.isEmpty()) {
+            // Show loading indicator
+            if (isLoading) {
+                Column(
+                    modifier = Modifier.fillMaxSize(),
+                    verticalArrangement = Arrangement.Center,
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    CircularProgressIndicator()
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text("Loading staff data...")
+                }
+            } 
+            // Show error state
+            else if (error != null) {
+                Column(
+                    modifier = Modifier.fillMaxSize(),
+                    verticalArrangement = Arrangement.Center,
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = "Error",
+                        style = MaterialTheme.typography.headlineSmall,
+                        color = Color.Red
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(error ?: "Unknown error")
+                }
+            } 
+            // Show empty state
+            else if (filteredStaffList.isEmpty()) {
                 Text(
                     text = when (staffFilter) {
                         StaffFilter.ALL -> if (searchQuery.isBlank()) "No staff members found" else "No results for '$searchQuery'"
@@ -168,7 +234,9 @@ fun StaffListScreen(
                     style = MaterialTheme.typography.bodyLarge,
                     modifier = Modifier.padding(vertical = 16.dp)
                 )
-            } else {
+            } 
+            // Show staff list
+            else {
                 // Staff list
                 LazyColumn {
                     items(filteredStaffList) { staff ->

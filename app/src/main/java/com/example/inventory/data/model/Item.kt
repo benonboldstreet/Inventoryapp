@@ -22,8 +22,28 @@ data class Item(
     val isActive: Boolean = true, // Flag for active vs archived items
     val lastModified: Any? = null // Changed from Long to Any to handle both Timestamp and Long
 ) {
+    // Create a deterministic UUID from the idString if it's not already a UUID format
     val id: UUID
-        get() = if (idString.isEmpty()) UUID.randomUUID() else UUID.fromString(idString)
+        get() = try {
+            if (idString.isEmpty()) {
+                android.util.Log.d("Item", "Empty idString, returning random UUID")
+                UUID.randomUUID()
+            } else {
+                try {
+                    // First try to parse directly as UUID
+                    android.util.Log.d("Item", "Attempting to parse as UUID: $idString")
+                    UUID.fromString(idString)
+                } catch (e: IllegalArgumentException) {
+                    // Not a valid UUID format, create a deterministic UUID from the string
+                    android.util.Log.d("Item", "Not valid UUID, using nameUUIDFromBytes: $idString")
+                    UUID.nameUUIDFromBytes(idString.toByteArray())
+                }
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("Item", "Error creating UUID from idString: $idString", e)
+            // Fallback to deterministic UUID in any error case
+            UUID.nameUUIDFromBytes(idString.toByteArray())
+        }
     
     // Add a method to safely get lastModified as a timestamp
     fun getLastModifiedTime(): Long {

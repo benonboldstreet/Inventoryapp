@@ -11,6 +11,8 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
@@ -22,6 +24,8 @@ import javax.inject.Inject
 class ItemViewModel @Inject constructor(
     private val itemRepository: ItemRepository
 ) : ViewModel() {
+    private val _uiState = MutableStateFlow<ItemUiState>(ItemUiState.Loading)
+    val uiState: StateFlow<ItemUiState> = _uiState.asStateFlow()
 
     // Direct access to repository - no mapping needed since we're using model objects
     val allItems: Flow<List<Item>> = itemRepository.getAllItems()
@@ -64,21 +68,36 @@ class ItemViewModel @Inject constructor(
     // Add a new item
     fun addItem(item: Item) {
         viewModelScope.launch {
-            itemRepository.insertItem(item)
+            try {
+                itemRepository.insertItem(item)
+                loadItems() // Reload items after adding
+            } catch (e: Exception) {
+                _uiState.value = ItemUiState.Error(e.message ?: "Failed to add item")
+            }
         }
     }
     
     // Update an existing item
     fun updateItem(item: Item) {
         viewModelScope.launch {
-            itemRepository.updateItem(item)
+            try {
+                itemRepository.updateItem(item)
+                loadItems() // Reload items after updating
+            } catch (e: Exception) {
+                _uiState.value = ItemUiState.Error(e.message ?: "Failed to update item")
+            }
         }
     }
     
     // Delete an item
     fun deleteItem(item: Item) {
         viewModelScope.launch {
-            itemRepository.deleteItem(item)
+            try {
+                itemRepository.deleteItem(item)
+                loadItems() // Reload items after deleting
+            } catch (e: Exception) {
+                _uiState.value = ItemUiState.Error(e.message ?: "Failed to delete item")
+            }
         }
     }
     
@@ -246,179 +265,142 @@ class ItemViewModel @Inject constructor(
         }
     }
     
-    // Add a method to force a refresh of items from Firestore
+    // Add a refresh method that forces a manual refresh
     fun refreshItems() {
         viewModelScope.launch {
             try {
-                android.util.Log.d("ItemViewModel", "===== FORCED REFRESH STARTED =====")
+                android.util.Log.d("ItemViewModel", "Manual refresh triggered")
                 
-                // Create a temporary flow to receive fresh data
-                itemRepository.getAllItems().collect { freshItems ->
-                    android.util.Log.d("ItemViewModel", "Forced refresh retrieved ${freshItems.size} total items")
-                    android.util.Log.d("ItemViewModel", "Active items: ${freshItems.count { it.isActive }}")
-                    android.util.Log.d("ItemViewModel", "Archived items: ${freshItems.count { !it.isActive }}")
+                // Check if our repository is a FirebaseItemRepository
+                if (itemRepository is com.example.inventory.data.firebase.FirebaseItemRepository) {
+                    // Use reflection to call a method that might not be directly accessible
+                    android.util.Log.d("ItemViewModel", "Using Firebase repository, triggering refresh")
                     
-                    // Log details of each archived item
-                    freshItems.filter { !it.isActive }.forEach { item ->
-                        android.util.Log.d("ItemViewModel", "Refreshed archived item: id=${item.id}, name=${item.name}")
+                    // First check for a method called refreshItems
+                    try {
+                        val method = itemRepository.javaClass.getDeclaredMethod("refreshItems")
+                        method.isAccessible = true
+                        method.invoke(itemRepository)
+                        android.util.Log.d("ItemViewModel", "Called refreshItems method")
+                        return@launch
+                    } catch (e: NoSuchMethodException) {
+                        android.util.Log.d("ItemViewModel", "No refreshItems method found, trying to trigger listener setup")
                     }
                     
-                    // Only need to collect once to trigger UI update
-                    android.util.Log.d("ItemViewModel", "===== FORCED REFRESH COMPLETED =====")
-                    return@collect
+                    // If no refreshItems method, try to trigger setupItemsListener
+                    try {
+                        val method = itemRepository.javaClass.getDeclaredMethod("setupItemsListener")
+                        method.isAccessible = true
+                        method.invoke(itemRepository)
+                        android.util.Log.d("ItemViewModel", "Called setupItemsListener method")
+                    } catch (e: Exception) {
+                        android.util.Log.e("ItemViewModel", "Error calling setupItemsListener: ${e.message}", e)
+                    }
                 }
             } catch (e: Exception) {
-                android.util.Log.e("ItemViewModel", "Error during forced refresh: ${e.message}", e)
+                android.util.Log.e("ItemViewModel", "Error refreshing items: ${e.message}", e)
             }
         }
     }
     
-    // Add a method to directly query Firestore for archived items
+    // Query archived items directly from Firestore
     fun directQueryArchivedItems(callback: (List<Item>) -> Unit) {
         viewModelScope.launch {
             try {
-                android.util.Log.d("ItemViewModel", "===== DIRECT QUERY FOR ARCHIVED ITEMS =====")
+                android.util.Log.d("ItemViewModel", "Directly querying archived items")
                 
-                // Check if we have FirebaseItemRepository
+                // Check if our repository is a FirebaseItemRepository
                 if (itemRepository is com.example.inventory.data.firebase.FirebaseItemRepository) {
-                    android.util.Log.d("ItemViewModel", "Using FirebaseItemRepository for direct query")
+                    android.util.Log.d("ItemViewModel", "Using Firebase repository for direct query")
                     
-                    // Cast and use the repository
-                    val firebaseRepo = itemRepository as com.example.inventory.data.firebase.FirebaseItemRepository
-                    val archivedItems = firebaseRepo.getArchivedItemsDirectly()
+                    // Call the direct query method
+                    val archivedItems = (itemRepository as com.example.inventory.data.firebase.FirebaseItemRepository)
+                        .getArchivedItemsDirectly()
                     
                     android.util.Log.d("ItemViewModel", "Direct query found ${archivedItems.size} archived items")
-                    archivedItems.forEach { item ->
-                        android.util.Log.d("ItemViewModel", "Direct query found: id=${item.id}, name=${item.name}, isActive=${item.isActive}")
-                    }
-                    
-                    // Return the results via callback
                     callback(archivedItems)
                 } else {
-                    android.util.Log.e("ItemViewModel", "Not using FirebaseItemRepository, can't direct query")
-                    callback(emptyList())
+                    android.util.Log.d("ItemViewModel", "Not using Firebase repository, falling back to filter")
+                    
+                    // Fall back to filtering the allItems flow
+                    val items = itemRepository.getAllItems().map { items -> 
+                        items.filter { !it.isActive } 
+                    }.collect { archivedItems ->
+                        android.util.Log.d("ItemViewModel", "Filter found ${archivedItems.size} archived items")
+                        callback(archivedItems)
+                    }
                 }
             } catch (e: Exception) {
-                android.util.Log.e("ItemViewModel", "Error in direct query for archived items: ${e.message}", e)
+                android.util.Log.e("ItemViewModel", "Error in direct query: ${e.message}", e)
                 callback(emptyList())
             }
         }
     }
     
-    /**
-     * Fix archived items in Firestore to ensure they have proper isActive=false Boolean values
-     */
-    fun fixArchivedItems(callback: (Int) -> Unit) {
+    // Check if repository has active listeners
+    fun checkRepositoryListeners() {
         viewModelScope.launch {
             try {
-                android.util.Log.d("ItemViewModel", "===== FIXING ARCHIVED ITEMS =====")
+                android.util.Log.d("ItemViewModel", "Checking repository listeners")
                 
-                // Check if we have FirebaseItemRepository
+                // Check if our repository is a FirebaseItemRepository
                 if (itemRepository is com.example.inventory.data.firebase.FirebaseItemRepository) {
-                    android.util.Log.d("ItemViewModel", "Using FirebaseItemRepository for fixing")
-                    
-                    // Cast to FirebaseItemRepository
-                    val firebaseRepo = itemRepository as com.example.inventory.data.firebase.FirebaseItemRepository
-                    
-                    // Get a reference to Firestore
-                    val firestore = com.google.firebase.firestore.FirebaseFirestore.getInstance()
-                    val itemsCollection = firestore.collection("items")
-                    
-                    // Get all documents
-                    val snapshot = itemsCollection.get().await()
-                    android.util.Log.d("ItemViewModel", "Found ${snapshot.documents.size} total items in Firestore")
-                    
-                    // Filter for items that might be archived but have incorrect isActive field
-                    val potentialArchivedItems = snapshot.documents.filter { doc ->
-                        val isActiveValue = doc.get("isActive")
-                        
-                        // Check for various non-Boolean false values
-                        isActiveValue != null && (
-                            (isActiveValue !is Boolean && isActiveValue.toString().equals("false", ignoreCase = true)) ||
-                            (isActiveValue !is Boolean && isActiveValue.toString().equals("0", ignoreCase = true)) ||
-                            (isActiveValue is Number && isActiveValue.toInt() == 0)
-                        )
+                    // First check for a method called checkIsActiveFieldType
+                    try {
+                        val method = itemRepository.javaClass.getDeclaredMethod("checkIsActiveFieldType")
+                        method.isAccessible = true
+                        method.invoke(itemRepository)
+                        android.util.Log.d("ItemViewModel", "Called checkIsActiveFieldType method")
+                    } catch (e: Exception) {
+                        android.util.Log.e("ItemViewModel", "Error calling checkIsActiveFieldType: ${e.message}", e)
                     }
-                    
-                    android.util.Log.d("ItemViewModel", "Found ${potentialArchivedItems.size} items with potentially incorrect isActive values")
-                    
-                    // Fix each item by explicitly setting isActive to Boolean false
-                    var fixedCount = 0
-                    potentialArchivedItems.forEach { doc ->
-                        try {
-                            val id = doc.id
-                            val name = doc.getString("name") ?: "Unknown"
-                            val rawIsActive = doc.get("isActive")
-                            
-                            android.util.Log.d("ItemViewModel", "Fixing item $id - $name with current isActive value: $rawIsActive (${rawIsActive?.javaClass?.simpleName})")
-                            
-                            // Update the document with explicit Boolean false
-                            itemsCollection.document(id)
-                                .update("isActive", false)
-                                .await()
-                            
-                            // Verify the fix
-                            val verifyDoc = itemsCollection.document(id).get().await()
-                            val verifyIsActive = verifyDoc.getBoolean("isActive")
-                            
-                            if (verifyIsActive == false) {
-                                android.util.Log.d("ItemViewModel", "Successfully fixed item $id")
-                                fixedCount++
-                            } else {
-                                android.util.Log.e("ItemViewModel", "Failed to fix item $id - isActive is still $verifyIsActive")
-                            }
-                        } catch (e: Exception) {
-                            android.util.Log.e("ItemViewModel", "Error fixing item ${doc.id}: ${e.message}", e)
-                        }
-                    }
-                    
-                    // Also check for any items with proper Boolean isActive=false
-                    val properArchivedItems = snapshot.documents.filter { doc ->
-                        val isActiveValue = doc.get("isActive")
-                        isActiveValue is Boolean && isActiveValue == false
-                    }
-                    
-                    android.util.Log.d("ItemViewModel", "Found ${properArchivedItems.size} items with proper Boolean isActive=false")
-                    
-                    // Return the count of fixed items
-                    android.util.Log.d("ItemViewModel", "Fixed $fixedCount items with incorrect isActive values")
-                    callback(fixedCount)
-                } else {
-                    android.util.Log.e("ItemViewModel", "Not using FirebaseItemRepository, can't fix archived items")
-                    callback(0)
                 }
             } catch (e: Exception) {
-                android.util.Log.e("ItemViewModel", "Error fixing archived items: ${e.message}", e)
-                callback(0)
+                android.util.Log.e("ItemViewModel", "Error checking repository listeners: ${e.message}", e)
             }
         }
     }
     
-    /**
-     * Debug method to check if the repository listeners are properly set up
-     */
-    fun checkRepositoryListeners() {
+    // Add a diagnostic method to check the repository setup
+    fun runItemsCollectionDiagnostics() {
         viewModelScope.launch {
             try {
-                // Force a repository refresh
-                val repo = itemRepository
+                android.util.Log.d("ItemViewModel", "Running items collection diagnostics")
                 
-                // Try to fetch items directly
-                if (repo is com.example.inventory.data.firebase.FirebaseItemRepository) {
-                    android.util.Log.d("ItemViewModel", "Checking FirebaseItemRepository listeners")
-                    // Try to force a refresh
-                    val items = repo.getArchivedItemsDirectly()
-                    android.util.Log.d("ItemViewModel", "Direct query found ${items.size} items")
+                // Check if we're using FirebaseItemRepository
+                if (itemRepository is com.example.inventory.data.firebase.FirebaseItemRepository) {
+                    android.util.Log.d("ItemViewModel", "Using FirebaseItemRepository, calling diagnostics")
                     
-                    // Log diagnostic info about the repository
-                    repo.checkIsActiveFieldType()
-                    android.util.Log.d("ItemViewModel", "Repository diagnostic check complete")
-                }
-                else {
-                    android.util.Log.d("ItemViewModel", "Repository is not FirebaseItemRepository, it's: ${repo.javaClass.simpleName}")
+                    // Call the diagnostic method
+                    (itemRepository as com.example.inventory.data.firebase.FirebaseItemRepository)
+                        .checkItemsCollectionSetup()
+                } else {
+                    android.util.Log.d("ItemViewModel", "Not using FirebaseItemRepository, can't run diagnostics")
                 }
             } catch (e: Exception) {
-                android.util.Log.e("ItemViewModel", "Error checking repository listeners: ${e.message}", e)
+                android.util.Log.e("ItemViewModel", "Error running diagnostics: ${e.message}", e)
+            }
+        }
+    }
+    
+    // Add a method to log all items with their IDs for debugging
+    fun logAllItemsWithIds() {
+        viewModelScope.launch {
+            try {
+                android.util.Log.d("ItemViewModel", "Starting full item ID dump")
+                
+                // Check if we're using FirebaseItemRepository
+                if (itemRepository is com.example.inventory.data.firebase.FirebaseItemRepository) {
+                    android.util.Log.d("ItemViewModel", "Using FirebaseItemRepository, calling ID dump function")
+                    
+                    // Call the diagnostic method
+                    (itemRepository as com.example.inventory.data.firebase.FirebaseItemRepository)
+                        .logAllItemsWithIds()
+                } else {
+                    android.util.Log.d("ItemViewModel", "Not using FirebaseItemRepository, can't run ID dump")
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("ItemViewModel", "Error running ID dump: ${e.message}", e)
             }
         }
     }
@@ -453,5 +435,24 @@ class ItemViewModel @Inject constructor(
                 }
             }
         }
+        loadItems()
     }
+
+    fun loadItems() {
+        viewModelScope.launch {
+            itemRepository.getAllItems()
+                .catch { e ->
+                    _uiState.value = ItemUiState.Error(e.message ?: "Unknown error")
+                }
+                .collect { items ->
+                    _uiState.value = ItemUiState.Success(items)
+                }
+        }
+    }
+}
+
+sealed class ItemUiState {
+    object Loading : ItemUiState()
+    data class Success(val items: List<Item>) : ItemUiState()
+    data class Error(val message: String) : ItemUiState()
 } 

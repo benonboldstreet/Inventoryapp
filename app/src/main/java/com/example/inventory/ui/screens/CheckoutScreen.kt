@@ -87,7 +87,11 @@ fun CheckoutScreen(
                         checkout = checkout,
                         onCheckIn = {
                             coroutineScope.launch {
-                                checkoutViewModel.checkInItem(checkout.id)
+                                val result = checkoutViewModel.checkInItem(checkout)
+                                if (!result.isSuccess) {
+                                    // Handle error - you could add error state handling here
+                                    android.util.Log.e("CheckoutScreen", "Error checking in item: ${result.exceptionOrNull()?.message}")
+                                }
                             }
                         }
                     )

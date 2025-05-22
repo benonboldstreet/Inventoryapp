@@ -7,9 +7,6 @@ import com.example.inventory.data.model.CheckoutLog
 import com.example.inventory.data.repository.ItemRepository
 import com.example.inventory.data.repository.StaffRepository
 import com.example.inventory.data.repository.CheckoutRepository
-import com.example.inventory.data.repository.CloudItemRepository
-import com.example.inventory.data.repository.CloudStaffRepository
-import com.example.inventory.data.repository.CloudCheckoutRepository
 import com.example.inventory.data.firebase.FirebaseItemRepository
 import com.example.inventory.data.firebase.FirebaseStaffRepository
 import com.example.inventory.data.firebase.FirebaseCheckoutRepository

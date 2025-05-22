@@ -60,4 +60,9 @@ interface ItemRepository {
      * Delete an item
      */
     suspend fun deleteItem(item: Item)
+    
+    /**
+     * Refresh items from Firebase
+     */
+    suspend fun refreshFromFirebase()
 } 

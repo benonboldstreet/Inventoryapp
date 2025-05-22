@@ -18,7 +18,18 @@ class StaffViewModel @Inject constructor(
 ) : ViewModel() {
 
     // Direct access to repository - no mapping needed since we're using model objects
-    val allStaff: Flow<List<Staff>> = staffRepository.getAllStaff()
+    val allStaff: Flow<List<Staff>> = flow {
+        try {
+            android.util.Log.d("StaffViewModel", "Collecting staff data from repository")
+            staffRepository.getAllStaff().collect { staffList ->
+                android.util.Log.d("StaffViewModel", "Received ${staffList.size} staff members from repository")
+                emit(staffList)
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("StaffViewModel", "Error collecting staff data: ${e.message}", e)
+            emit(emptyList<Staff>())
+        }
+    }
     
     /**
      * Get staff by department

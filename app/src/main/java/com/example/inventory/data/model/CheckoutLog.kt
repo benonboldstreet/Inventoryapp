@@ -13,11 +13,11 @@ data class CheckoutLog(
     @DocumentId val idString: String = "",
     val itemIdString: String = "",
     val staffIdString: String = "",
-    val checkOutTime: Any? = null, // Changed from Long to Any to handle Timestamp
-    val checkInTime: Any? = null, // Changed from Long? to Any? to handle Timestamp
+    val checkOutTime: Long = System.currentTimeMillis(),
+    val checkInTime: Long? = null,
     val photoPath: String? = null,
     val status: String = "CHECKED_OUT", // Status of the checkout (CHECKED_OUT, CHECKED_IN, OVERDUE, etc.)
-    val lastModified: Any? = null // Changed from Long to Any to handle Timestamp
+    val lastModified: Long = System.currentTimeMillis()
 ) {
     val id: UUID
         get() = if (idString.isEmpty()) UUID.randomUUID() else UUID.fromString(idString)
@@ -30,29 +30,17 @@ data class CheckoutLog(
     
     // Helper function to safely get checkOutTime as Long
     fun getCheckOutTimeAsLong(): Long {
-        return when (checkOutTime) {
-            is Long -> checkOutTime
-            is Timestamp -> (checkOutTime as Timestamp).seconds * 1000
-            else -> 0
-        }
+        return checkOutTime
     }
     
     // Helper function to safely get checkInTime as Long
     fun getCheckInTimeAsLong(): Long? {
-        return when (checkInTime) {
-            is Long -> checkInTime
-            is Timestamp -> (checkInTime as Timestamp).seconds * 1000
-            else -> null
-        }
+        return checkInTime
     }
     
     // Helper function to safely get lastModified as Long
     fun getLastModifiedTime(): Long {
-        return when (lastModified) {
-            is Long -> lastModified
-            is Timestamp -> (lastModified as Timestamp).seconds * 1000
-            else -> System.currentTimeMillis()
-        }
+        return lastModified
     }
     
     constructor(

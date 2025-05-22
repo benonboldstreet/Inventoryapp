@@ -12,9 +12,14 @@ import java.util.UUID
  */
 interface StaffRepository {
     /**
-     * Get all staff as a Flow
+     * Get all staff members as a Flow
      */
     fun getAllStaff(): Flow<List<Staff>>
+    
+    /**
+     * Get active staff as a Flow
+     */
+    fun getActiveStaff(): Flow<List<Staff>>
     
     /**
      * Get staff by department as a Flow
@@ -27,17 +32,27 @@ interface StaffRepository {
     suspend fun getStaffById(id: UUID): Staff?
     
     /**
-     * Insert a new staff record
+     * Get staff by email
+     */
+    suspend fun getStaffByEmail(email: String): Staff?
+    
+    /**
+     * Insert a new staff member
      */
     suspend fun insertStaff(staff: Staff)
     
     /**
-     * Update an existing staff record
+     * Update an existing staff member
      */
     suspend fun updateStaff(staff: Staff)
     
     /**
-     * Delete a staff record
+     * Delete a staff member
      */
     suspend fun deleteStaff(staff: Staff)
+    
+    /**
+     * Refresh staff data from Firebase
+     */
+    suspend fun refreshFromFirebase()
 } 

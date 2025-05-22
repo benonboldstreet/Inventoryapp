@@ -99,8 +99,14 @@ fun GroupedItemsScreen(
     // Collect items with error handling
     LaunchedEffect(key1 = viewModel) {
         try {
-            viewModel.allItems.collect { itemsList ->
-                items = itemsList
+            // Set up a periodic refresh mechanism
+            while (true) {
+                viewModel.allItems.collect { itemsList ->
+                    items = itemsList
+                }
+                // After collection completes, wait a bit and then collect again
+                // This ensures the UI stays updated with fresh data
+                kotlinx.coroutines.delay(3000) // Refresh every 3 seconds
             }
         } catch (e: Exception) {
             // Check for database integrity error specifically
@@ -134,8 +140,23 @@ fun GroupedItemsScreen(
         }
     }
     
-    // Group filtered items by category
-    val groupedItems = filteredItems.groupBy { it.category }
+    // Add debug logging for items and categories
+    LaunchedEffect(filteredItems) {
+        android.util.Log.d("GroupedItemsScreen", "==== FILTERED ITEMS ====")
+        android.util.Log.d("GroupedItemsScreen", "Total filtered items: ${filteredItems.size}")
+        
+        // Log the unique categories
+        val categories = filteredItems.map { it.category }.distinct()
+        android.util.Log.d("GroupedItemsScreen", "Unique categories (${categories.size}): ${categories.joinToString()}")
+    }
+    
+    // Group filtered items by category, ensuring no empty categories
+    val groupedItems = filteredItems
+        .groupBy { item -> 
+            // If category is empty, use type as fallback
+            if (item.category.isBlank()) item.type else item.category 
+        }
+        .filterKeys { it.isNotBlank() } // Filter out any empty category keys
     
     Scaffold(
         topBar = {
@@ -200,6 +221,7 @@ fun GroupedItemsScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(paddingValues)
+                    .padding(horizontal = 16.dp)
             ) {
                 // Search bar
                 OutlinedTextField(
@@ -207,7 +229,7 @@ fun GroupedItemsScreen(
                     onValueChange = { searchQuery = it },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                        .padding(vertical = 8.dp),
                     placeholder = { Text("Search by name, type, barcode or category") },
                     leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search") },
                     singleLine = true
@@ -346,7 +368,7 @@ fun ItemCardCompact(
         if (itemState.status == "Checked Out") {
             try {
                 // First collect the Flow to get the checkout
-                val checkout = checkoutViewModel.getCurrentCheckoutForItem(itemState.id).first()
+                val checkout = checkoutViewModel.getCurrentCheckoutForItem(itemState.id)
                 if (checkout != null) {
                     // Then collect the Flow to get the staff
                     val staff = staffViewModel.getStaffById(checkout.staffId).first()

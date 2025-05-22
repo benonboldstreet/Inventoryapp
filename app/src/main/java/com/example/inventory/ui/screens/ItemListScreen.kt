@@ -114,7 +114,27 @@ fun ItemListScreen(
     bottomBar: @Composable () -> Unit
 ) {
     val viewModel = itemViewModel()
-    val allItems by viewModel.allItems.collectAsState(initial = emptyList())
+    
+    // Create a state to hold items
+    var allItems by remember { mutableStateOf<List<Item>>(emptyList()) }
+    
+    // Collect items with error handling and debugging
+    LaunchedEffect(viewModel) {
+        try {
+            android.util.Log.d("ItemListScreen", "Setting up item collection")
+            viewModel.allItems.collect { items ->
+                android.util.Log.d("ItemListScreen", "Collected ${items.size} items from repository")
+                // Print first few items for debugging
+                items.take(3).forEach { item ->
+                    android.util.Log.d("ItemListScreen", "Item: ${item.id} - ${item.name}")
+                }
+                allItems = items
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("ItemListScreen", "Error collecting items: ${e.message}", e)
+        }
+    }
+    
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     
@@ -138,6 +158,15 @@ fun ItemListScreen(
             itemFilter = ItemFilter.ARCHIVED
             // Reset the flag after we've used it
             SharedViewModel.setShowArchivedItems(false)
+        }
+    }
+    
+    // Set up a periodic refresh for the items
+    LaunchedEffect(Unit) {
+        while (true) {
+            // Force refresh items periodically
+            viewModel.refreshItems()
+            kotlinx.coroutines.delay(3000) // Refresh every 3 seconds
         }
     }
     
@@ -365,6 +394,293 @@ fun ItemListScreen(
             )
         ) {
             Text("Create Test Archived Item", color = Color.White)
+        }
+
+        // Force Refresh Button - RED
+        Button(
+            onClick = {
+                android.util.Log.d("ItemListScreen", "Force refresh button pressed")
+                // Force a refresh of the items repository
+                viewModel.refreshItems()
+                
+                // Show a toast to indicate refresh is happening
+                Toast.makeText(
+                    context,
+                    "Forcing items refresh...",
+                    Toast.LENGTH_SHORT
+                ).show()
+                
+                // Add a delayed check to see if items appear
+                coroutineScope.launch {
+                    kotlinx.coroutines.delay(1000)
+                    android.util.Log.d("ItemListScreen", "After refresh delay, items count: ${allItems.size}")
+                    
+                    val message = "After refresh: ${allItems.size} items\n" +
+                        "Active: ${allItems.count { it.isActive }}\n" +
+                        "Archived: ${allItems.count { !it.isActive }}"
+                    
+                    Toast.makeText(
+                        context,
+                        message,
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
+            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = Color.Red)
+        ) {
+            Text("FORCE REFRESH ITEMS", color = Color.White, fontWeight = FontWeight.Bold)
+        }
+
+        // Test ID Conversion - BLUE
+        Button(
+            onClick = {
+                android.util.Log.d("ItemListScreen", "Testing ID conversion button pressed")
+                
+                // Test for a specific Firestore document ID
+                val firestoreDocId = "XYZqbGZX3XicshArMRQ5" // The problematic ID from your database
+                
+                // Generate UUID from this ID
+                val generatedUuid = java.util.UUID.nameUUIDFromBytes(firestoreDocId.toByteArray())
+                
+                android.util.Log.d("ItemListScreen", "Original Firestore ID: $firestoreDocId")
+                android.util.Log.d("ItemListScreen", "Generated UUID: $generatedUuid")
+                
+                // Show a toast with conversion info
+                Toast.makeText(
+                    context,
+                    "Converting ID: $firestoreDocId\nTo UUID: $generatedUuid",
+                    Toast.LENGTH_LONG
+                ).show()
+                
+                // Try to fetch item directly from Firestore
+                coroutineScope.launch {
+                    try {
+                        // Direct Firestore lookup
+                        val firestore = com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                        val docRef = firestore.collection("items").document(firestoreDocId)
+                        val doc = docRef.get().await()
+                        
+                        if (doc.exists()) {
+                            val data = doc.data
+                            android.util.Log.d("ItemListScreen", "Found document: $data")
+                            
+                            // Show toast with doc details
+                            Toast.makeText(
+                                context,
+                                "Found item: ${doc.getString("name")}",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                            
+                            // Try to load this item through the ViewModel using the generated UUID
+                            viewModel.getItemById(generatedUuid).collect { item ->
+                                if (item != null) {
+                                    android.util.Log.d("ItemListScreen", "Successfully loaded item through ViewModel: ${item.name}")
+                                    Toast.makeText(
+                                        context,
+                                        "Success: Item loaded with generated UUID!",
+                                        Toast.LENGTH_LONG
+                                    ).show()
+                                } else {
+                                    android.util.Log.e("ItemListScreen", "Failed to load item through ViewModel")
+                                    Toast.makeText(
+                                        context,
+                                        "Failed to load item with generated UUID",
+                                        Toast.LENGTH_LONG
+                                    ).show()
+                                }
+                            }
+                        } else {
+                            android.util.Log.e("ItemListScreen", "Document not found in Firestore")
+                            Toast.makeText(
+                                context,
+                                "Item not found in Firestore: $firestoreDocId",
+                                Toast.LENGTH_LONG
+                            ).show()
+                        }
+                    } catch (e: Exception) {
+                        android.util.Log.e("ItemListScreen", "Error testing ID conversion: ${e.message}", e)
+                        Toast.makeText(
+                            context,
+                            "Error: ${e.message}",
+                            Toast.LENGTH_LONG
+                        ).show()
+                    }
+                }
+            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = Color.Blue)
+        ) {
+            Text("TEST ID CONVERSION", color = Color.White, fontWeight = FontWeight.Bold)
+        }
+
+        // New debug button to directly query Firestore for items
+        Button(
+            onClick = {
+                android.util.Log.d("ItemListDebug", "Testing direct Firestore access for items")
+                
+                // Show toast to indicate we're starting
+                Toast.makeText(
+                    context,
+                    "Directly querying Firestore for items...",
+                    Toast.LENGTH_SHORT
+                ).show()
+                
+                coroutineScope.launch {
+                    try {
+                        // Get direct Firestore access
+                        val firestore = FirebaseFirestore.getInstance()
+                        
+                        // Query the items collection directly
+                        val snapshot = firestore.collection("items").get().await()
+                        
+                        android.util.Log.d("ItemListDebug", "============ DIRECT FIRESTORE QUERY ============")
+                        android.util.Log.d("ItemListDebug", "Found ${snapshot.documents.size} documents in items collection")
+                        
+                        // Debug each document
+                        snapshot.documents.forEach { doc ->
+                            val id = doc.id
+                            val name = doc.getString("name") ?: "Unknown"
+                            val type = doc.getString("type") ?: "Unknown"
+                            val idString = doc.getString("idString") ?: "Not set"
+                            val isActiveRaw = doc.get("isActive")
+                            
+                            android.util.Log.d("ItemListDebug", "Item in Firestore: ID=$id, idString=$idString, name=$name, type=$type, isActive=$isActiveRaw")
+                            
+                            // Try to create a deterministic UUID
+                            val calculatedUuid = try {
+                                java.util.UUID.nameUUIDFromBytes(id.toByteArray())
+                            } catch (e: Exception) {
+                                null
+                            }
+                            
+                            android.util.Log.d("ItemListDebug", "Calculated UUID: $calculatedUuid")
+                        }
+                        
+                        // Now check what's in our app's memory
+                        android.util.Log.d("ItemListDebug", "============ APP MEMORY ITEMS ============")
+                        android.util.Log.d("ItemListDebug", "App has ${allItems.size} items loaded")
+                        
+                        allItems.forEach { item ->
+                            android.util.Log.d("ItemListDebug", "Item in app: ID=${item.id}, idString=${item.idString}, name=${item.name}, type=${item.type}, isActive=${item.isActive}")
+                        }
+                        
+                        // Compare the two lists
+                        val firestoreIds = snapshot.documents.map { it.id }.toSet()
+                        val appItemIds = allItems.map { it.idString }.toSet()
+                        
+                        val missingInApp = firestoreIds - appItemIds
+                        val extraInApp = appItemIds - firestoreIds
+                        
+                        android.util.Log.d("ItemListDebug", "============ COMPARISON ============")
+                        android.util.Log.d("ItemListDebug", "Items in Firestore but missing in app: ${missingInApp.size}")
+                        missingInApp.forEach { id ->
+                            android.util.Log.d("ItemListDebug", "Missing item: $id")
+                        }
+                        
+                        android.util.Log.d("ItemListDebug", "Items in app but not in Firestore: ${extraInApp.size}")
+                        extraInApp.forEach { id ->
+                            android.util.Log.d("ItemListDebug", "Extra item: $id")
+                        }
+                        
+                        // Show result in a toast
+                        val message = "Found ${snapshot.documents.size} items in Firestore\n" +
+                                     "App has ${allItems.size} items loaded\n" +
+                                     "Missing in app: ${missingInApp.size}\n" +
+                                     "Check logs for details"
+                        
+                        Toast.makeText(
+                            context,
+                            message,
+                            Toast.LENGTH_LONG
+                        ).show()
+                    } catch (e: Exception) {
+                        android.util.Log.e("ItemListDebug", "Error querying Firestore: ${e.message}", e)
+                        
+                        Toast.makeText(
+                            context,
+                            "Error: ${e.message}",
+                            Toast.LENGTH_LONG
+                        ).show()
+                    }
+                }
+            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = Color.Green)
+        ) {
+            Text("DIAGNOSE ID PROBLEM", color = Color.White, fontWeight = FontWeight.Bold)
+        }
+
+        // Add a button to run the repository diagnostics
+        Button(
+            onClick = {
+                android.util.Log.d("ItemListDebug", "Running repository diagnostics")
+                
+                // Show toast
+                Toast.makeText(
+                    context,
+                    "Running repository diagnostics...",
+                    Toast.LENGTH_SHORT
+                ).show()
+                
+                // Run diagnostics
+                viewModel.runItemsCollectionDiagnostics()
+                
+                // Update UI
+                coroutineScope.launch {
+                    kotlinx.coroutines.delay(1000)
+                    Toast.makeText(
+                        context,
+                        "Diagnostics complete, check logs",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = Color.Magenta)
+        ) {
+            Text("RUN REPOSITORY DIAGNOSTICS", color = Color.White, fontWeight = FontWeight.Bold)
+        }
+
+        // Add a button to run the new ID dump diagnostic function
+        Button(
+            onClick = {
+                android.util.Log.d("ItemListDebug", "Dumping all items with ID details")
+                
+                // Show toast
+                Toast.makeText(
+                    context,
+                    "Dumping all items with ID details...",
+                    Toast.LENGTH_SHORT
+                ).show()
+                
+                // Run ID dump
+                viewModel.logAllItemsWithIds()
+                
+                // Update UI
+                coroutineScope.launch {
+                    kotlinx.coroutines.delay(1000)
+                    Toast.makeText(
+                        context,
+                        "ID dump complete, check logs",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = Color.Blue)
+        ) {
+            Text("DUMP ALL ITEM IDs", color = Color.White, fontWeight = FontWeight.Bold)
         }
     }
     

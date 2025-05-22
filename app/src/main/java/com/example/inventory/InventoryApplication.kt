@@ -38,18 +38,42 @@ class InventoryApplication : Application(), LifecycleObserver {
         super.onCreate()
         
         // Initialize Firebase
-        FirebaseApp.initializeApp(this)
+        try {
+            Log.i("InventoryApp", "Initializing Firebase...")
+            FirebaseApp.initializeApp(this)
+            Log.i("InventoryApp", "Firebase initialized successfully")
+        } catch (e: Exception) {
+            Log.e("InventoryApp", "ERROR initializing Firebase: ${e.message}", e)
+        }
         
         // Initialize the AppContainer with Firebase repositories
-        container = AppContainerImpl(this)
+        try {
+            Log.i("InventoryApp", "Initializing AppContainer...")
+            container = AppContainerImpl(this)
+            Log.i("InventoryApp", "AppContainer initialized successfully")
+        } catch (e: Exception) {
+            Log.e("InventoryApp", "ERROR initializing AppContainer: ${e.message}", e)
+        }
         
         // Initialize the offline cache
         applicationScope.launch {
-            OfflineCache.initialize(this@InventoryApplication)
+            try {
+                Log.i("InventoryApp", "Initializing offline cache...")
+                OfflineCache.initialize(this@InventoryApplication)
+                Log.i("InventoryApp", "Offline cache initialized successfully")
+            } catch (e: Exception) {
+                Log.e("InventoryApp", "ERROR initializing offline cache: ${e.message}", e)
+            }
         }
         
         // Initialize data prefetcher for performance optimization
-        DataPrefetcher.initialize(this)
+        try {
+            Log.i("InventoryApp", "Initializing data prefetcher...")
+            DataPrefetcher.initialize(this)
+            Log.i("InventoryApp", "Data prefetcher initialized successfully")
+        } catch (e: Exception) {
+            Log.e("InventoryApp", "ERROR initializing data prefetcher: ${e.message}", e)
+        }
         
         // Register as lifecycle observer for application lifecycle events
         ProcessLifecycleOwner.get().lifecycle.addObserver(this)

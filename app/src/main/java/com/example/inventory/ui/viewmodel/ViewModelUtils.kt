@@ -42,9 +42,10 @@ fun checkoutViewModel(): CheckoutViewModel {
     val context = LocalContext.current
     val application = context.applicationContext as InventoryApplication
     return viewModel(
-        factory = CheckoutViewModel.Companion.Factory(
+        factory = CheckoutViewModel.provideFactory(
             application.container.checkoutRepository,
-            application.container.itemRepository
+            application.container.itemRepository,
+            application.container.staffRepository
         )
     )
 } 

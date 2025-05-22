@@ -210,8 +210,8 @@ object NetworkModule {
     // Flag to use mock services for testing
     private var useMockServices = true
     
-    // Mock service instance
-    private var mockApiService: MockApiService? = null
+    // Mock service instance - removed reference to MockApiService
+    private var mockApiService: Any? = null
     
     private val gson: Gson = GsonBuilder()
         .setLenient()
@@ -261,22 +261,16 @@ object NetworkModule {
      * Initialize with mock services for testing
      */
     fun initWithMockServices(context: Context) {
-        if (mockApiService == null) {
-            mockApiService = MockApiService(context)
-        }
+        // MockApiService implementation removed
+        Log.d("NetworkModule", "Mock services are not available")
         
-        // Use mock services
-        _itemApiService = mockApiService!!.createMockItemApiService()
-        _staffApiService = mockApiService!!.createMockStaffApiService()
-        _checkoutApiService = mockApiService!!.createMockCheckoutApiService()
+        useMockServices = false
         
-        useMockServices = true
-        
-        Log.d("NetworkModule", "Initialized with mock services for testing")
+        Log.d("NetworkModule", "Defaulting to real services")
     }
     
     /**
-     * Switch to real cloud services
+     * Switch to real services
      */
     fun useRealServices() {
         _itemApiService = retrofit.create(ItemApiService::class.java)
@@ -298,7 +292,7 @@ object NetworkModule {
     /**
      * Get the mock service for test configuration
      */
-    fun getMockService(): MockApiService? {
+    fun getMockService(): Any? {
         return mockApiService
     }
     

@@ -138,7 +138,7 @@ fun BarcodeScannerScreen(
                     scannedItem = item
                     
                     // Check if the item is currently checked out
-                    val checkout = checkoutViewModel.getCurrentCheckoutForItem(item.id).first()
+                    val checkout = checkoutViewModel.getCurrentCheckoutForItem(item.id)
                     
                     if (checkout != null) {
                         // Item is checked out - prepare for check-in
@@ -286,11 +286,17 @@ fun BarcodeScannerScreen(
                 onCheckout = { item, staff ->
                     // Create checkout in the database
                     coroutineScope.launch {
-                        checkoutViewModel.checkOutItem(item.id, staff.id)
+                        val result = checkoutViewModel.checkOutItem(item.id, staff.id)
                         
-                        // Reset scanning
-                        showCheckoutDialog = false
-                        resetScanState()
+                        if (result.isSuccess) {
+                            // Reset scanning on success
+                            showCheckoutDialog = false
+                            resetScanState()
+                        } else {
+                            // Show error dialog
+                            errorMessage = "Failed to check out item: ${result.exceptionOrNull()?.message ?: "Unknown error"}"
+                            showErrorDialog = true
+                        }
                     }
                 },
                 onCheckoutWithPhoto = { item, staff ->
@@ -316,11 +322,18 @@ fun BarcodeScannerScreen(
                 onCheckin = {
                     // Check in the item
                     coroutineScope.launch {
-                        checkoutViewModel.checkInItem(scannedCheckout!!.id)
+                        val result = checkoutViewModel.checkInItem(scannedCheckout!!)
                         
-                        // Reset scanning
-                        showCheckinDialog = false
-                        resetScanState()
+                        if (result.isSuccess) {
+                            // Reset scanning on success
+                            showCheckinDialog = false
+                            resetScanState()
+                        } else {
+                            // Show error dialog
+                            errorMessage = "Failed to check in item: ${result.exceptionOrNull()?.message ?: "Unknown error"}"
+                            showErrorDialog = true
+                            showCheckinDialog = false
+                        }
                     }
                 },
                 onDismiss = {

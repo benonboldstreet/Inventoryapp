@@ -324,11 +324,14 @@ fun ItemDetailScreen(
                                                     // Find the active checkout log
                                                     val activeCheckout = checkoutLogs.find { it.getCheckInTimeAsLong() == null }
                                                     activeCheckout?.let { checkout ->
-                                                        // Check in the item - simplified call
-                                                        checkoutViewModel.checkInItem(checkout.id)
-                                                        
-                                                        // Just refresh the trigger to update the UI
-                                                        refreshTrigger++
+                                                        // Check in the item
+                                                        val result = checkoutViewModel.checkInItem(checkout)
+                                                        if (result.isSuccess) {
+                                                            // Just refresh the trigger to update the UI
+                                                            refreshTrigger++
+                                                        } else {
+                                                            throw result.exceptionOrNull() ?: Exception("Failed to check in item")
+                                                        }
                                                     }
                                                 } catch (e: Exception) {
                                                     android.util.Log.e("Checkin", "Error during check-in: ${e.message}", e)
@@ -414,15 +417,19 @@ fun ItemDetailScreen(
                         coroutineScope.launch {
                             try {
                                 // Perform checkout
-                                checkoutViewModel.checkOutItem(currentItem.id, selectedStaff.id)
+                                val checkoutResult = checkoutViewModel.checkOutItem(currentItem.id, selectedStaff.id)
                                 
-                                // Refresh UI
-                                refreshTrigger++
-                                
-                                // Show completion notification
-                                notificationTitle = "Success"
-                                notificationMessage = "Item checked out successfully"
-                                showNotificationDialog = true
+                                if (checkoutResult.isSuccess) {
+                                    // Refresh UI
+                                    refreshTrigger++
+                                    
+                                    // Show completion notification
+                                    notificationTitle = "Success"
+                                    notificationMessage = "Item checked out successfully"
+                                    showNotificationDialog = true
+                                } else {
+                                    throw checkoutResult.exceptionOrNull() ?: Exception("Unknown error during checkout")
+                                }
                             } catch (e: Exception) {
                                 android.util.Log.e("Checkout", "Error: ${e.message}", e)
                                 
