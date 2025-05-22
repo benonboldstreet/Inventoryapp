@@ -169,3 +169,11 @@ The Firebase implementation provides:
 Common issues and troubleshooting steps are available in the [Firebase Database Guide](FIREBASE_DATABASE_GUIDE.md).
 
 The app includes built-in debugging tools to help diagnose database issues.
+
+## Recent Updates
+
+### Performance Optimization (Latest)
+- [View detailed changes](UPDATES.md#performance-optimization-2024-02-13)
+- Improved local storage and Firebase sync
+- Reduced data usage and faster loading times
+- Better offline support and error handling
