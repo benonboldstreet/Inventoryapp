@@ -12,7 +12,7 @@ object ItemMapper {
         if (!exists()) return null
         
         return try {
-            val idString = id
+            val idString = getString("idString") ?: id
             val name = getString("name") ?: ""
             val category = getString("category") ?: ""
             val type = getString("type") ?: ""
@@ -25,7 +25,7 @@ object ItemMapper {
             val lastModified = getLong("lastModified") ?: System.currentTimeMillis()
             
             Item(
-                idString = idString,
+                id = UUID.fromString(idString),
                 name = name,
                 category = category,
                 type = type,
@@ -33,9 +33,9 @@ object ItemMapper {
                 condition = condition,
                 status = status,
                 description = description,
-                photoPath = photoPath,
                 isActive = isActive,
-                lastModified = lastModified
+                lastModified = lastModified,
+                photoPath = photoPath
             )
         } catch (e: Exception) {
             null
@@ -47,6 +47,7 @@ object ItemMapper {
      */
     fun Item.toMap(): Map<String, Any?> {
         return mapOf(
+            "idString" to idString,
             "name" to name,
             "category" to category,
             "type" to type,

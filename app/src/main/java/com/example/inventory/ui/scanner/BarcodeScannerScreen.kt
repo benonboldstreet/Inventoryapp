@@ -86,7 +86,14 @@ fun BarcodeScannerScreen(
     val checkoutViewModel = checkoutViewModel()
     
     // Get list of all staff for checkout dialog
-    val allStaff by staffViewModel.allStaff.collectAsState(initial = emptyList())
+    var staffList by remember { mutableStateOf<List<Staff>>(emptyList()) }
+    
+    // Load staff list when needed
+    LaunchedEffect(Unit) {
+        staffViewModel.getAllStaff().collect { staff ->
+            staffList = staff.filter { it.isActive }
+        }
+    }
     
     // States for camera and scanning
     var hasCameraPermission by remember { mutableStateOf(false) }
@@ -132,8 +139,10 @@ fun BarcodeScannerScreen(
             
             coroutineScope.launch {
                 // Find the item with this barcode
-                val item = itemViewModel.getItemByBarcode(barcode)
+                val itemResult = itemViewModel.getItemByBarcode(barcode)
                 
+                if (itemResult.isSuccess) {
+                    val item = itemResult.getOrNull()
                 if (item != null) {
                     scannedItem = item
                     
@@ -143,10 +152,12 @@ fun BarcodeScannerScreen(
                     if (checkout != null) {
                         // Item is checked out - prepare for check-in
                         scannedCheckout = checkout
-                        scannedStaff = staffViewModel.getStaffById(checkout.staffId).first()
+                            staffViewModel.getStaffById(checkout.staffId).collect { staff ->
+                                scannedStaff = staff
                         
                         // Show check-in dialog
                         showCheckinDialog = true
+                            }
                     } else if (item.status == "Available") {
                         // Item is available - prepare for checkout
                         showCheckoutDialog = true
@@ -156,14 +167,18 @@ fun BarcodeScannerScreen(
                         showErrorDialog = true
                         
                         // Reset scanning
+                            resetScanState()
+                        }
+                    } else {
+                        // Barcode not found
+                        errorMessage = "Item exists but data is invalid"
+                        showErrorDialog = true
                         resetScanState()
                     }
                 } else {
                     // Barcode not found
                     errorMessage = "No item found with barcode: $barcode"
                     showErrorDialog = true
-                    
-                    // Reset scanning
                     resetScanState()
                 }
             }
@@ -282,11 +297,11 @@ fun BarcodeScannerScreen(
         if (showCheckoutDialog && scannedItem != null) {
             CheckoutDialog(
                 item = scannedItem!!,
-                staffList = allStaff,
+                staffList = staffList,
                 onCheckout = { item, staff ->
                     // Create checkout in the database
                     coroutineScope.launch {
-                        val result = checkoutViewModel.checkOutItem(item.id, staff.id)
+                        val result = checkoutViewModel.checkoutItem(item.id, staff.id)
                         
                         if (result.isSuccess) {
                             // Reset scanning on success
@@ -320,17 +335,16 @@ fun BarcodeScannerScreen(
                 item = scannedItem!!,
                 staffName = scannedStaff!!.name,
                 onCheckin = {
-                    // Check in the item
+                    // Handle check-in
                     coroutineScope.launch {
-                        val result = checkoutViewModel.checkInItem(scannedCheckout!!)
-                        
+                        val result = checkoutViewModel.checkinItem(scannedCheckout!!)
                         if (result.isSuccess) {
-                            // Reset scanning on success
+                            // Show success message
                             showCheckinDialog = false
                             resetScanState()
                         } else {
-                            // Show error dialog
-                            errorMessage = "Failed to check in item: ${result.exceptionOrNull()?.message ?: "Unknown error"}"
+                            // Show error message
+                            errorMessage = "Error checking in item: ${result.exceptionOrNull()?.message ?: "Unknown error"}"
                             showErrorDialog = true
                             showCheckinDialog = false
                         }

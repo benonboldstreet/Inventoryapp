@@ -64,10 +64,10 @@ import androidx.compose.ui.window.Dialog
 import com.example.inventory.data.model.Item
 import com.example.inventory.ui.components.StatusIndicator
 import com.example.inventory.ui.components.getStatusColor
-import com.example.inventory.ui.viewmodel.itemViewModel
 import com.example.inventory.ui.viewmodel.SharedViewModel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 import java.util.UUID
 import com.example.inventory.util.FirestoreChecker
 import androidx.compose.ui.platform.LocalContext
@@ -75,35 +75,12 @@ import kotlinx.coroutines.launch
 import android.widget.Toast
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.tasks.await
+import com.example.inventory.ui.viewmodel.ItemListViewModel
+import androidx.hilt.navigation.compose.hiltViewModel
 
 // Enum for item filtering
 enum class ItemFilter {
     ALL, ACTIVE, ARCHIVED
-}
-
-// Simple ItemRepository singleton for accessing categories
-class ItemRepository private constructor(private val context: android.content.Context) {
-    companion object {
-        @Volatile
-        private var INSTANCE: ItemRepository? = null
-        
-        fun getRepository(context: android.content.Context): ItemRepository {
-            return INSTANCE ?: synchronized(this) {
-                val instance = ItemRepository(context)
-                INSTANCE = instance
-                instance
-            }
-        }
-    }
-    
-    // Get the real repository from the app container
-    private val appContainer = (context.applicationContext as com.example.inventory.InventoryApplication).container
-    private val realRepository = appContainer.itemRepository
-    
-    // Method to get all categories from database
-    suspend fun getAllCategories(): Flow<List<String>> {
-        return realRepository.getAllCategories()
-    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -111,9 +88,11 @@ class ItemRepository private constructor(private val context: android.content.Co
 fun ItemListScreen(
     onItemClick: (UUID) -> Unit,
     onBarcodeScanner: () -> Unit,
-    bottomBar: @Composable () -> Unit
+    bottomBar: @Composable () -> Unit,
+    viewModel: ItemListViewModel = hiltViewModel()
 ) {
-    val viewModel = itemViewModel()
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
     
     // Create a state to hold items
     var allItems by remember { mutableStateOf<List<Item>>(emptyList()) }
@@ -134,9 +113,6 @@ fun ItemListScreen(
             android.util.Log.e("ItemListScreen", "Error collecting items: ${e.message}", e)
         }
     }
-    
-    val context = LocalContext.current
-    val coroutineScope = rememberCoroutineScope()
     
     // State for direct query results
     var directQueryResults by remember { mutableStateOf<List<Item>>(emptyList()) }
@@ -177,10 +153,9 @@ fun ItemListScreen(
         if (itemFilter == ItemFilter.ARCHIVED) {
             android.util.Log.d("ItemListScreen", "Querying archived items directly from Firestore")
             // Use the direct query method instead of filtering
-            viewModel.directQueryArchivedItems { items ->
-                directQueryResults = items
-                android.util.Log.d("ItemListScreen", "Received ${items.size} archived items from direct query")
-            }
+            val items = viewModel.getArchivedItems()
+            directQueryResults = items
+            android.util.Log.d("ItemListScreen", "Received ${items.size} archived items from direct query")
         }
     }
     
@@ -279,14 +254,13 @@ fun ItemListScreen(
                         FirestoreChecker.checkArchivedItems(context)
                         
                         // Also run direct query again
-                        viewModel.directQueryArchivedItems { items ->
-                            directQueryResults = items
-                            Toast.makeText(
-                                context,
-                                "Direct query found ${items.size} archived items",
-                                Toast.LENGTH_LONG
-                            ).show()
-                        }
+                        val items = viewModel.getArchivedItems()
+                        directQueryResults = items
+                        Toast.makeText(
+                            context,
+                            "Direct query found ${items.size} archived items",
+                            Toast.LENGTH_LONG
+                        ).show()
                     } catch (e: Exception) {
                         android.util.Log.e("ItemListScreen", "Error checking archived items: ${e.message}", e)
                         Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_LONG).show()
@@ -314,7 +288,8 @@ fun ItemListScreen(
                 ).show()
                 
                 // Just run the direct query to show what's available
-                viewModel.directQueryArchivedItems { items ->
+                coroutineScope.launch {
+                    val items = viewModel.getArchivedItems()
                     directQueryResults = items
                     if (items.isNotEmpty()) {
                         Toast.makeText(
@@ -346,11 +321,9 @@ fun ItemListScreen(
             onClick = {
                 // Create a test item directly in Firestore
                 val firestore = FirebaseFirestore.getInstance()
-                val testItemId = UUID.randomUUID().toString()
                 
                 // Create a map with all required item fields
                 val testItem = mapOf(
-                    "idString" to testItemId,
                     "name" to "Test Archived Item",
                     "category" to "Test",
                     "type" to "Debug",
@@ -363,18 +336,19 @@ fun ItemListScreen(
                     "lastModified" to System.currentTimeMillis()
                 )
                 
-                // Add the item to Firestore
-                firestore.collection("items").document(testItemId)
-                    .set(testItem)
-                    .addOnSuccessListener {
+                // Add the item to Firestore and let Firebase generate the ID
+                firestore.collection("items")
+                    .add(testItem)
+                    .addOnSuccessListener { docRef ->
                         Toast.makeText(
                             context, 
-                            "Test archived item created in Firestore", 
+                            "Test archived item created in Firestore with ID: ${docRef.id}", 
                             Toast.LENGTH_LONG
                         ).show()
                         
                         // Refresh to show the new item
-                        viewModel.directQueryArchivedItems { items ->
+                        coroutineScope.launch {
+                            val items = viewModel.getArchivedItems()
                             directQueryResults = items
                         }
                     }
@@ -630,7 +604,7 @@ fun ItemListScreen(
                 ).show()
                 
                 // Run diagnostics
-                viewModel.runItemsCollectionDiagnostics()
+                viewModel.refreshItems()
                 
                 // Update UI
                 coroutineScope.launch {
@@ -663,7 +637,7 @@ fun ItemListScreen(
                 ).show()
                 
                 // Run ID dump
-                viewModel.logAllItemsWithIds()
+                viewModel.refreshItems()
                 
                 // Update UI
                 coroutineScope.launch {

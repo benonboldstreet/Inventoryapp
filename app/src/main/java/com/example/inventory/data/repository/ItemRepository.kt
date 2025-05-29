@@ -5,46 +5,34 @@ import kotlinx.coroutines.flow.Flow
 import java.util.UUID
 
 /**
- * Repository interface for managing Item data operations
- * 
- * This defines the contract for item repository implementations,
- * whether they're using local storage or cloud storage.
+ * Repository interface for Item operations
  */
 interface ItemRepository {
+    
     /**
-     * Get all items as a Flow
+     * Get all items
      */
     fun getAllItems(): Flow<List<Item>>
     
     /**
-     * Get items by status as a Flow
+     * Get an item by ID
      */
-    fun getItemsByStatus(status: String): Flow<List<Item>>
+    fun getItemById(id: UUID): Flow<Item?>
     
     /**
-     * Get items by type as a Flow
+     * Get an item by barcode
      */
-    fun getItemsByType(type: String): Flow<List<Item>>
+    fun getItemByBarcode(barcode: String): Flow<Item?>
     
     /**
-     * Get items by category as a Flow
+     * Get items by category
      */
     fun getItemsByCategory(category: String): Flow<List<Item>>
     
     /**
-     * Get all custom categories as a Flow
+     * Get all categories
      */
     fun getAllCategories(): Flow<List<String>>
-    
-    /**
-     * Get item by its barcode
-     */
-    suspend fun getItemByBarcode(barcode: String): Item?
-    
-    /**
-     * Get item by ID
-     */
-    suspend fun getItemById(id: UUID): Item?
     
     /**
      * Insert a new item
@@ -62,7 +50,7 @@ interface ItemRepository {
     suspend fun deleteItem(item: Item)
     
     /**
-     * Refresh items from Firebase
+     * Refresh data from Firebase
      */
     suspend fun refreshFromFirebase()
 } 

@@ -83,46 +83,61 @@ fun ReportScreen(
 ) {
     val scope = rememberCoroutineScope()
     
-    // Get checkout data from viewModel
-    val checkoutLogs by remember { mutableStateOf<List<CheckoutLog>>(emptyList()) }
+    // State for data
+    var checkoutReports by remember { mutableStateOf<List<CheckoutReport>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
-    var checkoutReports by remember { mutableStateOf<List<CheckoutReport>>(emptyList()) }
     
-    // Use LaunchedEffect to safely collect checkout data
-    LaunchedEffect(key1 = viewModel) {
+    // Collect checkout logs using a safer approach
+    LaunchedEffect(viewModel) {
+        isLoading = true
+        errorMessage = null
+        
         try {
-            isLoading = true
-            viewModel.getAllCheckoutLogs().collect { logs ->
-                // Process the logs to create reports
-                val reports = mutableListOf<CheckoutReport>()
-                for (log in logs) {
+            // Use a more direct approach to load the data
+            viewModel.getAllCheckoutLogs().collect { checkoutLogs ->
+                Log.d("ReportScreen", "Received ${checkoutLogs.size} checkout logs")
+                
+                // Process checkout logs and build reports
+                scope.launch {
                     try {
-                        val itemId = UUID.fromString(log.itemIdString)
-                        val staffId = UUID.fromString(log.staffIdString)
+                        val reports = mutableListOf<CheckoutReport>()
                         
-                        val item = viewModel.getItemById(itemId)
-                        val staff = viewModel.getStaffById(staffId)
-                        
-                        if (item != null && staff != null) {
-                            reports.add(
-                                CheckoutReport(
-                                    checkoutLog = log,
-                                    item = item,
-                                    staff = staff
-                                )
-                            )
+                        for (log in checkoutLogs) {
+                            try {
+                                // Fetch item and staff info directly from repository
+                                val item = viewModel.getItemById(log.itemId)
+                                val staff = viewModel.getStaffById(log.staffId)
+                                
+                                if (item != null && staff != null) {
+                                    reports.add(
+                                        CheckoutReport(
+                                            checkoutLog = log,
+                                            item = item,
+                                            staff = staff
+                                        )
+                                    )
+                                } else {
+                                    Log.w("ReportScreen", "Skipping report - Item or Staff not found: itemId=${log.itemId}, staffId=${log.staffId}")
+                                }
+                            } catch (e: Exception) {
+                                Log.e("ReportScreen", "Error processing checkout log ${log.id}: ${e.message}", e)
+                            }
                         }
+                        
+                        // Update UI with completed reports
+                        checkoutReports = reports
+                        isLoading = false
                     } catch (e: Exception) {
-                        Log.e("ReportScreen", "Error processing checkout log: ${e.message}", e)
+                        Log.e("ReportScreen", "Error processing reports: ${e.message}", e)
+                        errorMessage = "Error processing reports: ${e.message}"
+                        isLoading = false
                     }
                 }
-                checkoutReports = reports
-                isLoading = false
             }
         } catch (e: Exception) {
             Log.e("ReportScreen", "Error loading checkout data: ${e.message}", e)
-            errorMessage = "Failed to load checkout data: ${e.message}"
+            errorMessage = "Failed to load data: ${e.message}"
             isLoading = false
         }
     }
@@ -180,7 +195,7 @@ fun ReportScreen(
                     Button(onClick = {
                         isLoading = true
                         errorMessage = null
-                        // Reload will happen through LaunchedEffect
+                        // The LaunchedEffect will trigger a reload automatically
                     }) {
                         Text("Retry")
                     }
@@ -245,7 +260,7 @@ fun ReportScreen(
                         )
                         
                         // Current checkouts count
-                        val currentCheckouts = checkoutReports.count { it.checkoutLog.checkInTime == null }
+                        val currentCheckouts = checkoutReports.count { it.checkoutLog.checkinTimestamp == null }
                         SummaryCard(
                             title = "Current Checkouts",
                             value = "$currentCheckouts",
@@ -277,26 +292,28 @@ fun ReportScreen(
 
 @Composable
 fun CheckoutReportItem(report: CheckoutReport) {
-    // Get timestamp values using the safe getXXXTimeAsLong methods
+    // Get timestamp values using the direct properties, with safer error handling
     val checkoutDate = try {
-        val timestamp = report.checkoutLog.getCheckOutTimeAsLong()
+        val timestamp = report.checkoutLog.checkoutTimestamp
         SimpleDateFormat("MMM dd, yyyy HH:mm", Locale.getDefault()).format(Date(timestamp))
     } catch (e: Exception) {
+        Log.e("ReportScreen", "Error formatting checkout date: ${e.message}")
         "Unknown date"
     }
     
     val checkInDate = try {
-        val timestamp = report.checkoutLog.getCheckInTimeAsLong()
+        val timestamp = report.checkoutLog.checkinTimestamp
         if (timestamp != null) {
             SimpleDateFormat("MMM dd, yyyy HH:mm", Locale.getDefault()).format(Date(timestamp))
         } else {
             null
         }
     } catch (e: Exception) {
+        Log.e("ReportScreen", "Error formatting checkin date: ${e.message}")
         null
     }
     
-    val isCheckedOut = report.checkoutLog.checkInTime == null
+    val isCheckedOut = report.checkoutLog.checkinTimestamp == null
     
     Card(
         modifier = Modifier

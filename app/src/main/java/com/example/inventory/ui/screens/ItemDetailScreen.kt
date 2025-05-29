@@ -133,7 +133,7 @@ fun ItemDetailScreen(
     // Fetch staff list when needed
     LaunchedEffect(showStaffSelectorDialog) {
         if (showStaffSelectorDialog) {
-            staffList = staffViewModel.allStaff.first().filter { it.isActive } // Only show active staff
+            staffList = staffViewModel.getAllStaff().first().filter { it.isActive } // Only show active staff
         }
     }
     
@@ -322,10 +322,10 @@ fun ItemDetailScreen(
                                             coroutineScope.launch {
                                                 try {
                                                     // Find the active checkout log
-                                                    val activeCheckout = checkoutLogs.find { it.getCheckInTimeAsLong() == null }
+                                                    val activeCheckout = checkoutLogs.find { it.checkinTimestamp == null }
                                                     activeCheckout?.let { checkout ->
                                                         // Check in the item
-                                                        val result = checkoutViewModel.checkInItem(checkout)
+                                                        val result = checkoutViewModel.checkinItem(checkout)
                                                         if (result.isSuccess) {
                                                             // Just refresh the trigger to update the UI
                                                             refreshTrigger++
@@ -381,7 +381,7 @@ fun ItemDetailScreen(
                     
                     Spacer(modifier = Modifier.height(8.dp))
                     
-                    checkoutLogs.sortedByDescending { it.getCheckOutTimeAsLong() }.forEach { log ->
+                    checkoutLogs.sortedByDescending { it.checkoutTimestamp }.forEach { log ->
                         CheckoutLogCard(log, staffViewModel)
                         Spacer(modifier = Modifier.height(8.dp))
                     }
@@ -417,7 +417,7 @@ fun ItemDetailScreen(
                         coroutineScope.launch {
                             try {
                                 // Perform checkout
-                                val checkoutResult = checkoutViewModel.checkOutItem(currentItem.id, selectedStaff.id)
+                                val checkoutResult = checkoutViewModel.checkoutItem(currentItem.id, selectedStaff.id)
                                 
                                 if (checkoutResult.isSuccess) {
                                     // Refresh UI
@@ -622,7 +622,7 @@ fun CheckoutLogCard(
     
     // Load staff name
     LaunchedEffect(log) {
-        staffViewModel.getStaffById(UUID.fromString(log.staffIdString)).collect { staff ->
+        staffViewModel.getStaffById(log.staffId).collect { staff ->
             staffName = staff?.name ?: "Unknown Staff"
         }
     }
@@ -641,14 +641,14 @@ fun CheckoutLogCard(
         
         // Check-out time
         val checkoutDateFormat = java.text.SimpleDateFormat("MMM dd, yyyy 'at' hh:mm a", java.util.Locale.getDefault())
-        val checkoutDate = java.util.Date(log.getCheckOutTimeAsLong())
+        val checkoutDate = java.util.Date(log.checkoutTimestamp)
         Text(
             text = "Checked out: ${checkoutDateFormat.format(checkoutDate)}",
             style = MaterialTheme.typography.bodyMedium
         )
         
         // Check-in time if available
-        log.getCheckInTimeAsLong()?.let { checkInTime ->
+        log.checkinTimestamp?.let { checkInTime ->
             val checkinDate = java.util.Date(checkInTime)
             Text(
                 text = "Checked in: ${checkoutDateFormat.format(checkinDate)}",

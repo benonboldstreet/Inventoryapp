@@ -1,23 +1,12 @@
 package com.example.inventory
 
 import android.app.Application
-import com.example.inventory.data.AppContainer
-import com.example.inventory.data.AppContainerImpl
+import android.content.Context
 import android.util.Log
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleObserver
-import androidx.lifecycle.OnLifecycleEvent
-import androidx.lifecycle.ProcessLifecycleOwner
-import com.example.inventory.api.AuthManager
-import com.example.inventory.api.AuthNetworkModule
-import com.example.inventory.api.DataPrefetcher
-import com.example.inventory.api.OfflineCache
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.launch
-import com.example.inventory.api.NetworkModule
 import com.google.firebase.FirebaseApp
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.FirebaseFirestoreSettings
+import dagger.hilt.android.HiltAndroidApp
 
 /**
  * Inventory Application
@@ -26,92 +15,70 @@ import com.google.firebase.FirebaseApp
  * All inventory items, staff data, and checkout logs are stored in Firestore.
  * Supports offline operation with data caching.
  */
-class InventoryApplication : Application(), LifecycleObserver {
+@HiltAndroidApp
+class InventoryApplication : Application() {
     
-    // AppContainer instance used by the rest of the app
-    lateinit var container: AppContainer
+    companion object {
+        private const val TAG = "InventoryApplication"
+        
+        // Pre-load disabling of Crashlytics
+        init {
+            // Set system properties to disable Crashlytics completely
+            System.setProperty("firebase.crashlytics.collection.enabled", "false")
+            System.setProperty("firebase.crashlytics.mapping.upload.enabled", "false")
+            System.setProperty("firebase.crashlytics.auto.data.collection.enabled", "false")
+            System.setProperty("firebase.performance.collection.enabled", "false")
+        }
+    }
     
-    // Application scope for coroutines that should live as long as the application
-    private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    override fun attachBaseContext(base: Context) {
+        super.attachBaseContext(base)
+        // Disable Crashlytics collection through the API as early as possible
+        try {
+            // More direct approach to disable Crashlytics
+            val crashlyticsClassLoader = Class.forName("com.google.firebase.crashlytics.FirebaseCrashlytics")
+            crashlyticsClassLoader.getMethod("setCrashlyticsCollectionEnabled", Boolean::class.java)
+                .invoke(null, false)
+            Log.d(TAG, "Disabled Crashlytics collection through the API")
+        } catch (e: Exception) {
+            // This is expected if the Crashlytics SDK is not available
+            Log.d(TAG, "Crashlytics SDK not found, which is good")
+        }
+    }
     
     override fun onCreate() {
         super.onCreate()
         
-        // Initialize Firebase
+        // Initialize Firebase safely
         try {
-            Log.i("InventoryApp", "Initializing Firebase...")
+            // Check if Firebase is already initialized
+            if (FirebaseApp.getApps(this).isEmpty()) {
+                try {
+                    // Initialize Firebase without Crashlytics
+                    Log.d(TAG, "Initializing Firebase app")
             FirebaseApp.initializeApp(this)
-            Log.i("InventoryApp", "Firebase initialized successfully")
+                    Log.d(TAG, "Firebase initialized successfully")
+                    
+                    // Configure Firestore with error handling
+                    try {
+                        val settings = FirebaseFirestoreSettings.Builder()
+                            .setPersistenceEnabled(true)  // Enable offline persistence
+                            .setCacheSizeBytes(FirebaseFirestoreSettings.CACHE_SIZE_UNLIMITED)
+                            .build()
+                        
+                        FirebaseFirestore.getInstance().firestoreSettings = settings
+                        Log.d(TAG, "Firestore configured successfully")
         } catch (e: Exception) {
-            Log.e("InventoryApp", "ERROR initializing Firebase: ${e.message}", e)
+                        Log.e(TAG, "Error configuring Firestore: ${e.message}", e)
         }
-        
-        // Initialize the AppContainer with Firebase repositories
-        try {
-            Log.i("InventoryApp", "Initializing AppContainer...")
-            container = AppContainerImpl(this)
-            Log.i("InventoryApp", "AppContainer initialized successfully")
-        } catch (e: Exception) {
-            Log.e("InventoryApp", "ERROR initializing AppContainer: ${e.message}", e)
-        }
-        
-        // Initialize the offline cache
-        applicationScope.launch {
-            try {
-                Log.i("InventoryApp", "Initializing offline cache...")
-                OfflineCache.initialize(this@InventoryApplication)
-                Log.i("InventoryApp", "Offline cache initialized successfully")
             } catch (e: Exception) {
-                Log.e("InventoryApp", "ERROR initializing offline cache: ${e.message}", e)
+                    Log.e(TAG, "Error initializing Firebase: ${e.message}", e)
             }
-        }
-        
-        // Initialize data prefetcher for performance optimization
-        try {
-            Log.i("InventoryApp", "Initializing data prefetcher...")
-            DataPrefetcher.initialize(this)
-            Log.i("InventoryApp", "Data prefetcher initialized successfully")
+            } else {
+                Log.d(TAG, "Firebase already initialized")
+            }
         } catch (e: Exception) {
-            Log.e("InventoryApp", "ERROR initializing data prefetcher: ${e.message}", e)
-        }
-        
-        // Register as lifecycle observer for application lifecycle events
-        ProcessLifecycleOwner.get().lifecycle.addObserver(this)
-        
-        // Log that we're running with Firebase Firestore
-        Log.i("InventoryApp", "Starting with FIREBASE FIRESTORE - Includes offline support")
-    }
-    
-    /**
-     * Called when the application is terminating
-     */
-    override fun onTerminate() {
-        super.onTerminate()
-        // Shutdown any background processes
-        // No shutdown method in OfflineCache anymore, so nothing to do here
-    }
-    
-    /**
-     * Called when the application moves to the background
-     */
-    @OnLifecycleEvent(Lifecycle.Event.ON_STOP)
-    fun onAppBackgrounded() {
-        Log.d("InventoryApp", "App in background")
-        // Perform background sync
-        applicationScope.launch {
-            OfflineCache.attemptSync(this@InventoryApplication)
-        }
-    }
-    
-    /**
-     * Called when the application comes to the foreground
-     */
-    @OnLifecycleEvent(Lifecycle.Event.ON_START)
-    fun onAppForegrounded() {
-        Log.d("InventoryApp", "App in foreground")
-        // Perform sync on app resume
-        applicationScope.launch {
-            OfflineCache.attemptSync(this@InventoryApplication)
+            Log.e(TAG, "Error in Firebase initialization: ${e.message}", e)
         }
     }
 } 

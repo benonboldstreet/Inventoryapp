@@ -7,6 +7,7 @@ import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.tasks.await
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -31,13 +32,13 @@ class FirebaseCheckoutLogRepository @Inject constructor(
                     val data = doc.data ?: return@mapNotNull null
                     CheckoutLog(
                         id = UUID.fromString(doc.id),
-                        itemId = UUID.fromString(data["itemId"] as String),
-                        staffId = UUID.fromString(data["staffId"] as String),
-                        checkOutTime = (data["checkOutTime"] as? Number)?.toLong() ?: System.currentTimeMillis(),
-                        checkInTime = (data["checkInTime"] as? Number)?.toLong(),
-                        status = data["status"] as? String ?: "CHECKED_OUT",
-                        photoPath = data["photoPath"] as? String,
-                        lastModified = (data["lastModified"] as? Number)?.toLong() ?: System.currentTimeMillis()
+                        itemId = UUID.fromString(data["itemIdString"] as String),
+                        staffId = UUID.fromString(data["staffIdString"] as String),
+                        checkoutTimestamp = (data["checkoutTimestamp"] as? Number)?.toLong() ?: System.currentTimeMillis(),
+                        checkinTimestamp = (data["checkinTimestamp"] as? Number)?.toLong(),
+                        checkoutPhotoPath = data["checkoutPhotoPath"] as? String,
+                        checkinPhotoPath = data["checkinPhotoPath"] as? String,
+                        notes = data["notes"] as? String ?: ""
                     )
                 } catch (e: Exception) {
                     Log.e(TAG, "Error converting document to CheckoutLog: ${e.message}", e)
@@ -50,7 +51,7 @@ class FirebaseCheckoutLogRepository @Inject constructor(
     }
 
     override fun getCheckoutLogsByItem(itemId: UUID): Flow<List<CheckoutLog>> = callbackFlow {
-        val listener = collection.whereEqualTo("itemId", itemId.toString())
+        val listener = collection.whereEqualTo("itemIdString", itemId.toString())
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
                     Log.e(TAG, "Error getting checkout logs by item: ${error.message}", error)
@@ -63,13 +64,13 @@ class FirebaseCheckoutLogRepository @Inject constructor(
                         val data = doc.data ?: return@mapNotNull null
                         CheckoutLog(
                             id = UUID.fromString(doc.id),
-                            itemId = UUID.fromString(data["itemId"] as String),
-                            staffId = UUID.fromString(data["staffId"] as String),
-                            checkOutTime = (data["checkOutTime"] as? Number)?.toLong() ?: System.currentTimeMillis(),
-                            checkInTime = (data["checkInTime"] as? Number)?.toLong(),
-                            status = data["status"] as? String ?: "CHECKED_OUT",
-                            photoPath = data["photoPath"] as? String,
-                            lastModified = (data["lastModified"] as? Number)?.toLong() ?: System.currentTimeMillis()
+                            itemId = UUID.fromString(data["itemIdString"] as String),
+                            staffId = UUID.fromString(data["staffIdString"] as String),
+                            checkoutTimestamp = (data["checkoutTimestamp"] as? Number)?.toLong() ?: System.currentTimeMillis(),
+                            checkinTimestamp = (data["checkinTimestamp"] as? Number)?.toLong(),
+                            checkoutPhotoPath = data["checkoutPhotoPath"] as? String,
+                            checkinPhotoPath = data["checkinPhotoPath"] as? String,
+                            notes = data["notes"] as? String ?: ""
                         )
                     } catch (e: Exception) {
                         Log.e(TAG, "Error converting document to CheckoutLog: ${e.message}", e)
@@ -82,7 +83,7 @@ class FirebaseCheckoutLogRepository @Inject constructor(
     }
 
     override fun getCheckoutLogsByStaff(staffId: UUID): Flow<List<CheckoutLog>> = callbackFlow {
-        val listener = collection.whereEqualTo("staffId", staffId.toString())
+        val listener = collection.whereEqualTo("staffIdString", staffId.toString())
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
                     Log.e(TAG, "Error getting checkout logs by staff: ${error.message}", error)
@@ -95,13 +96,13 @@ class FirebaseCheckoutLogRepository @Inject constructor(
                         val data = doc.data ?: return@mapNotNull null
                         CheckoutLog(
                             id = UUID.fromString(doc.id),
-                            itemId = UUID.fromString(data["itemId"] as String),
-                            staffId = UUID.fromString(data["staffId"] as String),
-                            checkOutTime = (data["checkOutTime"] as? Number)?.toLong() ?: System.currentTimeMillis(),
-                            checkInTime = (data["checkInTime"] as? Number)?.toLong(),
-                            status = data["status"] as? String ?: "CHECKED_OUT",
-                            photoPath = data["photoPath"] as? String,
-                            lastModified = (data["lastModified"] as? Number)?.toLong() ?: System.currentTimeMillis()
+                            itemId = UUID.fromString(data["itemIdString"] as String),
+                            staffId = UUID.fromString(data["staffIdString"] as String),
+                            checkoutTimestamp = (data["checkoutTimestamp"] as? Number)?.toLong() ?: System.currentTimeMillis(),
+                            checkinTimestamp = (data["checkinTimestamp"] as? Number)?.toLong(),
+                            checkoutPhotoPath = data["checkoutPhotoPath"] as? String,
+                            checkinPhotoPath = data["checkinPhotoPath"] as? String,
+                            notes = data["notes"] as? String ?: ""
                         )
                     } catch (e: Exception) {
                         Log.e(TAG, "Error converting document to CheckoutLog: ${e.message}", e)
@@ -127,13 +128,13 @@ class FirebaseCheckoutLogRepository @Inject constructor(
                         val data = doc.data ?: return@mapNotNull null
                         CheckoutLog(
                             id = UUID.fromString(doc.id),
-                            itemId = UUID.fromString(data["itemId"] as String),
-                            staffId = UUID.fromString(data["staffId"] as String),
-                            checkOutTime = (data["checkOutTime"] as? Number)?.toLong() ?: System.currentTimeMillis(),
-                            checkInTime = (data["checkInTime"] as? Number)?.toLong(),
-                            status = data["status"] as? String ?: "CHECKED_OUT",
-                            photoPath = data["photoPath"] as? String,
-                            lastModified = (data["lastModified"] as? Number)?.toLong() ?: System.currentTimeMillis()
+                            itemId = UUID.fromString(data["itemIdString"] as String),
+                            staffId = UUID.fromString(data["staffIdString"] as String),
+                            checkoutTimestamp = (data["checkoutTimestamp"] as? Number)?.toLong() ?: System.currentTimeMillis(),
+                            checkinTimestamp = (data["checkinTimestamp"] as? Number)?.toLong(),
+                            checkoutPhotoPath = data["checkoutPhotoPath"] as? String,
+                            checkinPhotoPath = data["checkinPhotoPath"] as? String,
+                            notes = data["notes"] as? String ?: ""
                         )
                     } catch (e: Exception) {
                         Log.e(TAG, "Error converting document to CheckoutLog: ${e.message}", e)
@@ -146,8 +147,8 @@ class FirebaseCheckoutLogRepository @Inject constructor(
     }
 
     override fun getCheckoutLogsByDateRange(startTime: Long, endTime: Long): Flow<List<CheckoutLog>> = callbackFlow {
-        val listener = collection.whereGreaterThanOrEqualTo("checkOutTime", startTime)
-            .whereLessThanOrEqualTo("checkOutTime", endTime)
+        val listener = collection.whereGreaterThanOrEqualTo("checkoutTimestamp", startTime)
+            .whereLessThanOrEqualTo("checkoutTimestamp", endTime)
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
                     Log.e(TAG, "Error getting checkout logs by date range: ${error.message}", error)
@@ -160,13 +161,13 @@ class FirebaseCheckoutLogRepository @Inject constructor(
                         val data = doc.data ?: return@mapNotNull null
                         CheckoutLog(
                             id = UUID.fromString(doc.id),
-                            itemId = UUID.fromString(data["itemId"] as String),
-                            staffId = UUID.fromString(data["staffId"] as String),
-                            checkOutTime = (data["checkOutTime"] as? Number)?.toLong() ?: System.currentTimeMillis(),
-                            checkInTime = (data["checkInTime"] as? Number)?.toLong(),
-                            status = data["status"] as? String ?: "CHECKED_OUT",
-                            photoPath = data["photoPath"] as? String,
-                            lastModified = (data["lastModified"] as? Number)?.toLong() ?: System.currentTimeMillis()
+                            itemId = UUID.fromString(data["itemIdString"] as String),
+                            staffId = UUID.fromString(data["staffIdString"] as String),
+                            checkoutTimestamp = (data["checkoutTimestamp"] as? Number)?.toLong() ?: System.currentTimeMillis(),
+                            checkinTimestamp = (data["checkinTimestamp"] as? Number)?.toLong(),
+                            checkoutPhotoPath = data["checkoutPhotoPath"] as? String,
+                            checkinPhotoPath = data["checkinPhotoPath"] as? String,
+                            notes = data["notes"] as? String ?: ""
                         )
                     } catch (e: Exception) {
                         Log.e(TAG, "Error converting document to CheckoutLog: ${e.message}", e)
@@ -179,7 +180,7 @@ class FirebaseCheckoutLogRepository @Inject constructor(
     }
 
     override fun getActiveCheckouts(): Flow<List<CheckoutLog>> = callbackFlow {
-        val listener = collection.whereEqualTo("status", "CHECKED_OUT")
+        val listener = collection.whereEqualTo("checkinTimestamp", null)
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
                     Log.e(TAG, "Error getting active checkouts: ${error.message}", error)
@@ -192,13 +193,13 @@ class FirebaseCheckoutLogRepository @Inject constructor(
                         val data = doc.data ?: return@mapNotNull null
                         CheckoutLog(
                             id = UUID.fromString(doc.id),
-                            itemId = UUID.fromString(data["itemId"] as String),
-                            staffId = UUID.fromString(data["staffId"] as String),
-                            checkOutTime = (data["checkOutTime"] as? Number)?.toLong() ?: System.currentTimeMillis(),
-                            checkInTime = (data["checkInTime"] as? Number)?.toLong(),
-                            status = data["status"] as? String ?: "CHECKED_OUT",
-                            photoPath = data["photoPath"] as? String,
-                            lastModified = (data["lastModified"] as? Number)?.toLong() ?: System.currentTimeMillis()
+                            itemId = UUID.fromString(data["itemIdString"] as String),
+                            staffId = UUID.fromString(data["staffIdString"] as String),
+                            checkoutTimestamp = (data["checkoutTimestamp"] as? Number)?.toLong() ?: System.currentTimeMillis(),
+                            checkinTimestamp = (data["checkinTimestamp"] as? Number)?.toLong(),
+                            checkoutPhotoPath = data["checkoutPhotoPath"] as? String,
+                            checkinPhotoPath = data["checkinPhotoPath"] as? String,
+                            notes = data["notes"] as? String ?: ""
                         )
                     } catch (e: Exception) {
                         Log.e(TAG, "Error converting document to CheckoutLog: ${e.message}", e)
@@ -212,23 +213,39 @@ class FirebaseCheckoutLogRepository @Inject constructor(
 
     override suspend fun checkoutItem(itemId: UUID, staffId: UUID, photoPath: String?): CheckoutLog {
         val checkoutLog = CheckoutLog(
+            id = UUID.randomUUID(),
             itemId = itemId,
             staffId = staffId,
-            checkOutTime = System.currentTimeMillis(),
-            status = "CHECKED_OUT",
-            photoPath = photoPath
+            checkoutTimestamp = System.currentTimeMillis(),
+            checkoutPhotoPath = photoPath
         )
-        collection.document(checkoutLog.id.toString()).set(checkoutLog)
+        val data = mapOf(
+            "idString" to checkoutLog.idString,
+            "itemIdString" to checkoutLog.itemIdString,
+            "staffIdString" to checkoutLog.staffIdString,
+            "checkoutTimestamp" to checkoutLog.checkoutTimestamp,
+            "checkoutPhotoPath" to checkoutLog.checkoutPhotoPath,
+            "notes" to checkoutLog.notes
+        )
+        collection.document(checkoutLog.idString).set(data).await()
         return checkoutLog
     }
 
     override suspend fun checkinItem(checkoutLog: CheckoutLog) {
         val updatedLog = checkoutLog.copy(
-            checkInTime = System.currentTimeMillis(),
-            status = "CHECKED_IN",
-            lastModified = System.currentTimeMillis()
+            checkinTimestamp = System.currentTimeMillis()
         )
-        collection.document(updatedLog.id.toString()).set(updatedLog)
+        val data = mapOf(
+            "idString" to updatedLog.idString,
+            "itemIdString" to updatedLog.itemIdString,
+            "staffIdString" to updatedLog.staffIdString,
+            "checkoutTimestamp" to updatedLog.checkoutTimestamp,
+            "checkinTimestamp" to updatedLog.checkinTimestamp,
+            "checkoutPhotoPath" to updatedLog.checkoutPhotoPath,
+            "checkinPhotoPath" to updatedLog.checkinPhotoPath,
+            "notes" to updatedLog.notes
+        )
+        collection.document(updatedLog.idString).set(data).await()
     }
 
     override suspend fun refreshFromFirebase() {

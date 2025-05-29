@@ -1,45 +1,39 @@
 package com.example.inventory.data.repository
 
 import com.example.inventory.data.model.CheckoutLog
+import com.example.inventory.data.model.Item
 import kotlinx.coroutines.flow.Flow
 import java.util.UUID
 
 /**
- * Repository interface for managing CheckoutLog data operations
- * 
- * This defines the contract for checkout repository implementations,
- * whether they're using local storage or cloud storage.
+ * Repository interface for checkout operations
  */
 interface CheckoutRepository {
+    
     /**
-     * Get all checkout logs as a Flow
+     * Get all checkout logs
      */
     fun getAllCheckoutLogs(): Flow<List<CheckoutLog>>
     
     /**
-     * Get checkout logs for a specific item as a Flow
+     * Get a checkout log by ID
      */
-    fun getCheckoutLogsByItemId(itemId: UUID): Flow<List<CheckoutLog>>
+    fun getCheckoutLogById(id: UUID): Flow<CheckoutLog?>
     
     /**
-     * Get checkout logs for a specific staff member as a Flow
+     * Get checkout logs for an item
      */
-    fun getCheckoutLogsByStaffId(staffId: UUID): Flow<List<CheckoutLog>>
+    fun getCheckoutsByItemId(itemId: UUID): Flow<List<CheckoutLog>>
     
     /**
-     * Get all current checkouts (not checked in yet) as a Flow
+     * Get checkout logs for a staff member
      */
-    fun getCurrentCheckouts(): Flow<List<CheckoutLog>>
+    fun getCheckoutsByStaffId(staffId: UUID): Flow<List<CheckoutLog>>
     
     /**
-     * Get current checkout for a specific item
+     * Get active checkouts (not checked in)
      */
-    suspend fun getCurrentCheckoutForItem(itemId: UUID): CheckoutLog?
-    
-    /**
-     * Get checkout log by ID
-     */
-    suspend fun getCheckoutLogById(id: UUID): CheckoutLog?
+    fun getActiveCheckouts(): Flow<List<CheckoutLog>>
     
     /**
      * Insert a new checkout log
@@ -59,15 +53,15 @@ interface CheckoutRepository {
     /**
      * Check out an item to a staff member
      */
-    suspend fun checkOutItem(itemId: UUID, staffId: UUID): CheckoutLog
-    
-    /**
-     * Check out an item with a photo
-     */
-    suspend fun checkOutItemWithPhoto(itemId: UUID, staffId: UUID, photoPath: String): CheckoutLog
+    suspend fun checkOutItem(itemId: UUID, staffId: UUID, notes: String = ""): CheckoutLog
     
     /**
      * Check in an item
      */
-    suspend fun checkInItem(checkoutLog: CheckoutLog): CheckoutLog
+    suspend fun checkInItem(checkoutLogId: UUID, notes: String = ""): CheckoutLog
+    
+    /**
+     * Refresh data from Firebase
+     */
+    suspend fun refreshFromFirebase()
 } 

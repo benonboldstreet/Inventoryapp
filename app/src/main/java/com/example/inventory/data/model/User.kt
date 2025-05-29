@@ -3,46 +3,26 @@ package com.example.inventory.data.model
 import java.util.UUID
 
 /**
- * Represents a user in the system
+ * Represents a user in the inventory system
  */
 data class User(
     /**
      * Unique identifier for the user
      */
-    val id: UUID = UUID.randomUUID(),
+    val id: UUID,
     
     /**
      * User's full name
      */
-    val name: String = "",
+    val name: String,
     
     /**
      * User's email address
      */
-    val email: String = "",
+    val email: String,
     
     /**
      * User's role in the system
      */
     val role: UserRole = UserRole.USER
-)
-
-/**
- * Available user roles in the system
- */
-enum class UserRole {
-    /**
-     * Administrator with full access
-     */
-    ADMIN,
-    
-    /**
-     * Manager with elevated access
-     */
-    MANAGER,
-    
-    /**
-     * Regular user with limited access
-     */
-    USER
-} 
+) 

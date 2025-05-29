@@ -87,7 +87,7 @@ fun StaffDetailScreen(
                 staff = fetchedStaff
                 
                 // Fetch checkout history for this staff member
-                checkoutHistory = checkoutViewModel.getCheckoutsByStaffId(id).first()
+                checkoutHistory = checkoutViewModel.getCheckoutLogsByStaff(id).first()
                 
                 // Fetch item names for each checkout
                 val itemNameMap = mutableMapOf<UUID, String>()
@@ -219,7 +219,7 @@ fun StaffDetailScreen(
                     )
                 } else {
                     LazyColumn {
-                        items(checkoutHistory.sortedByDescending { it.getCheckOutTimeAsLong() }) { checkout ->
+                        items(checkoutHistory.sortedByDescending { it.checkoutTimestamp }) { checkout ->
                             CheckoutHistoryCard(
                                 checkout = checkout,
                                 itemName = checkoutItemNames[checkout.id] ?: "Unknown Item"
@@ -319,13 +319,13 @@ fun CheckoutHistoryCard(
                     style = MaterialTheme.typography.bodyMedium
                 )
                 Text(
-                    text = dateFormat.format(Date(checkout.getCheckOutTimeAsLong())),
+                    text = dateFormat.format(Date(checkout.checkoutTimestamp)),
                     style = MaterialTheme.typography.bodyMedium
                 )
             }
             
             // Check-in date if available
-            checkout.getCheckInTimeAsLong()?.let { checkInTime ->
+            checkout.checkinTimestamp?.let { checkInTime ->
                 Row {
                     Text(
                         text = "Checked in: ",
@@ -340,7 +340,7 @@ fun CheckoutHistoryCard(
                 }
                 
                 // Calculate duration
-                val durationMillis = checkInTime - checkout.getCheckOutTimeAsLong()
+                val durationMillis = checkInTime - checkout.checkoutTimestamp
                 val hours = durationMillis / (1000 * 60 * 60)
                 val minutes = (durationMillis % (1000 * 60 * 60)) / (1000 * 60)
                 

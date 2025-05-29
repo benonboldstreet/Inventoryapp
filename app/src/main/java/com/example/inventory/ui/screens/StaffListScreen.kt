@@ -78,7 +78,7 @@ fun StaffListScreen(
         try {
             // Set up a periodic refresh
             while (true) {
-                viewModel.allStaff.collect { list ->
+                viewModel.getAllStaff().collect { list ->
                     staffList = list
                     isLoading = false
                 }
@@ -134,10 +134,10 @@ fun StaffListScreen(
                 onDismiss = { showAddStaffDialog = false },
                 onConfirm = { staff ->
                     // Add staff to repository
-                    viewModel.addStaff(staff)
-                    
-                    // Force a UI refresh after a slight delay to allow Firebase to update
                     coroutineScope.launch {
+                        viewModel.addStaff(staff)
+                        
+                        // Force a UI refresh after a slight delay to allow Firebase to update
                         kotlinx.coroutines.delay(500)
                         // Force reload by triggering the LaunchedEffect again
                         isLoading = true
@@ -418,13 +418,14 @@ fun StaffAddDialog(
                             if (!nameError && !departmentError) {
                                 // Create a proper Staff object with UUID
                                 val staff = Staff(
-                                    idString = UUID.randomUUID().toString(),
+                                    id = UUID.randomUUID(),
                                     name = name,
                                     department = department,
                                     email = email,
                                     phone = phone,
                                     position = position,
-                                    isActive = true
+                                    isActive = true,
+                                    lastModified = System.currentTimeMillis()
                                 )
                                 onConfirm(staff)
                             }

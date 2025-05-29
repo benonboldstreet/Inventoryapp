@@ -1,14 +1,14 @@
 package com.example.inventory.barcode
 
-import android.content.Context
 import android.util.Log
-import com.example.inventory.api.NetworkRetry
-import com.example.inventory.api.NetworkModule
 import com.example.inventory.data.model.Item
-import com.example.inventory.api.ItemDto
 import com.example.inventory.data.repository.ItemRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.first
+import java.util.UUID
+import javax.inject.Inject
+import javax.inject.Singleton
 
 /**
  * Barcode Manager
@@ -16,111 +16,40 @@ import kotlinx.coroutines.flow.flow
  * Handles barcode scanning operations and lookups.
  * Provides utilities for finding items by barcode and managing scan history.
  */
-object BarcodeManager {
-    private const val TAG = "BarcodeManager"
+@Singleton
+class BarcodeManager @Inject constructor(
+    private val itemRepository: ItemRepository
+) {
+    companion object {
+        private const val TAG = "BarcodeManager"
+        const val NO_MATCH = "NO_MATCH"
+        const val INVALID_BARCODE = "INVALID_BARCODE"
+        private const val MAX_RECENT_SCANS = 10
+    }
     
     // Recent scan history (limit to last 10)
     private val recentScans = mutableListOf<String>()
-    private const val MAX_RECENT_SCANS = 10
     
     /**
      * Find an item by its barcode
-     * Includes retry mechanism for network resilience
+     * Uses Firebase repository for lookups
      * 
      * @param barcode The barcode to look up
-     * @param itemRepository The repository to use for lookups
      * @return Flow of the found item or null if not found
      */
-    fun findItemByBarcode(
-        barcode: String,
-        itemRepository: ItemRepository
-    ): Flow<Item?> = flow {
+    fun findItemByBarcode(barcode: String): Flow<Item?> = flow {
         try {
             Log.d(TAG, "Looking up item with barcode: $barcode")
             
             // Add to recent scans list
             addToRecentScans(barcode)
             
-            // Use the repository to find the item with retry mechanism
-            val item = NetworkRetry.executeWithRetry {
-                itemRepository.getItemByBarcode(barcode)
-            }
-            
+            // Use the repository to find the item
+            val item = itemRepository.getItemByBarcode(barcode).first()
             emit(item)
         } catch (e: Exception) {
             Log.e(TAG, "Error finding item by barcode: $barcode", e)
             emit(null)
-        }
-    }
-    
-    /**
-     * Direct lookup using the API service
-     * Useful when repository is not available
-     */
-    suspend fun findItemByBarcodeDirectApi(barcode: String): Item? {
-        return try {
-            // Use network retry for resilience
-            NetworkRetry.executeWithRetry {
-                val apiResult = NetworkModule.itemApiService.getItemByBarcode(barcode)
-                
-                // Convert the result to an Item
-                convertToItem(apiResult)
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "Error finding item by barcode direct API: $barcode", e)
-            null
-        }
-    }
-    
-    /**
-     * Convert API result to Item
-     * Handles different return types from the API
-     */
-    private fun convertToItem(apiResult: Any?): Item? {
-        return when (apiResult) {
-            // If it's an ItemDto, convert directly
-            is ItemDto -> {
-                Item(
-                    idString = apiResult.id ?: "",
-                    name = apiResult.name,
-                    category = apiResult.category,
-                    type = apiResult.type,
-                    barcode = apiResult.barcode,
-                    condition = apiResult.condition,
-                    status = apiResult.status,
-                    photoPath = apiResult.photoPath,
-                    isActive = apiResult.isActive,
-                    lastModified = apiResult.lastModified ?: System.currentTimeMillis()
-                )
-            }
-            // If it's a Map, extract values
-            is Map<*, *> -> {
-                try {
-                    @Suppress("UNCHECKED_CAST")
-                    val typedMap = apiResult as Map<String, Any?>
-                    
-                    Item(
-                        idString = (typedMap["id"] as? String) ?: "",
-                        name = (typedMap["name"] as? String) ?: "",
-                        category = (typedMap["category"] as? String) ?: "",
-                        type = (typedMap["type"] as? String) ?: "",
-                        barcode = (typedMap["barcode"] as? String) ?: "",
-                        condition = (typedMap["condition"] as? String) ?: "",
-                        status = (typedMap["status"] as? String) ?: "",
-                        photoPath = typedMap["photoPath"] as? String,
-                        isActive = typedMap["isActive"] as? Boolean ?: true,
-                        lastModified = typedMap["lastModified"] as? Long ?: System.currentTimeMillis()
-                    )
-                } catch (e: ClassCastException) {
-                    Log.e(TAG, "Error casting Map data: ${e.message}")
-                    null
-                }
-            }
-            // Fallback for other types
-            else -> {
-                Log.e(TAG, "API returned an unexpected data type: ${apiResult?.javaClass?.name}")
-                null
-            }
         }
     }
     
@@ -175,5 +104,47 @@ object BarcodeManager {
         val checkDigit = (10 - (sum % 10)) % 10
         
         return "$prefix$middle$checkDigit"
+    }
+    
+    /**
+     * Look up an item by barcode
+     * 
+     * @param barcode The barcode to look up
+     * @return The item if found, null otherwise
+     */
+    suspend fun lookupItemByBarcode(barcode: String): Item? {
+        if (barcode.isBlank()) {
+            Log.w(TAG, "Cannot lookup empty barcode")
+            return null
+        }
+        
+        return try {
+            val item = itemRepository.getItemByBarcode(barcode).first()
+            Log.d(TAG, "Barcode lookup result: ${item?.name ?: "No match"}")
+            item
+        } catch (e: Exception) {
+            Log.e(TAG, "Error looking up barcode: ${e.message}", e)
+            null
+        }
+    }
+    
+    /**
+     * Process a scanned barcode
+     * 
+     * @param barcode The scanned barcode
+     * @return The found item or null if not found
+     */
+    suspend fun processScan(barcode: String): Result<Item?> {
+        if (barcode.isBlank()) {
+            return Result.failure(IllegalArgumentException("Barcode cannot be empty"))
+        }
+        
+        return try {
+            val item = itemRepository.getItemByBarcode(barcode).first()
+            Result.success(item)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error processing barcode scan: ${e.message}", e)
+            Result.failure(e)
+        }
     }
 } 

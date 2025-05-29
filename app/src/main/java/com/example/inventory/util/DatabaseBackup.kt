@@ -55,7 +55,7 @@ class DatabaseBackup @Inject constructor(
             backupFiles.add(staffFile.absolutePath)
             
             // Backup Checkout Logs
-            val checkoutSnapshot = firebaseConfig.firestore.collection("checkouts").get().await()
+            val checkoutSnapshot = firebaseConfig.firestore.collection("checkout_logs").get().await()
             val checkoutLogs = checkoutSnapshot.documents.mapNotNull { it.toObject(CheckoutLog::class.java) }
             val checkoutFile = File(backupDir, "checkout_logs_$timestamp.json")
             checkoutFile.writeText(gson.toJson(checkoutLogs))

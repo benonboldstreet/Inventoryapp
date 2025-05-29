@@ -33,22 +33,23 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
-import androidx.navigation.NavController
 import androidx.navigation.compose.rememberNavController
-import com.example.inventory.api.OfflineCache
 import com.example.inventory.ui.components.NetworkStatusBar
-import com.example.inventory.ui.components.SmallSyncIndicator
-import com.example.inventory.ui.components.SyncStatusIndicator
 import com.example.inventory.ui.navigation.InventoryDestinations
 import com.example.inventory.ui.navigation.InventoryNavHost
-import com.example.inventory.ui.viewmodel.SharedViewModel
 import com.example.inventory.ui.theme.InventoryTheme
+import com.example.inventory.ui.viewmodel.SharedViewModel
+import com.google.firebase.FirebaseApp
+import com.google.firebase.auth.FirebaseAuth
+import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 
 /**
  * Main Activity for the Inventory Cloud application
  */
+@AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     // Network callback for monitoring connectivity
     private lateinit var networkCallback: ConnectivityManager.NetworkCallback
@@ -59,9 +60,11 @@ class MainActivity : ComponentActivity() {
         // Set up global exception handler
         setupExceptionHandler()
         
-        // Initialize the container early to prepare cloud connections
-        val application = applicationContext as InventoryApplication
-        application.container
+        // Initialize Firebase if not already initialized
+        initializeFirebaseSafely()
+        
+        // Automatically sign in anonymously to Firebase
+        signInAnonymously()
         
         // Set up network connectivity monitoring
         setupNetworkMonitoring()
@@ -102,11 +105,6 @@ class MainActivity : ComponentActivity() {
                             showWelcomeMessage = false
                         }
                     }
-                    
-                    // Trigger initial sync
-                    scope.launch {
-                        OfflineCache.attemptSync(applicationContext)
-                    }
                 }
                 
                 Surface(
@@ -118,23 +116,11 @@ class MainActivity : ComponentActivity() {
                             // Show network status bar at the top of the UI
                             NetworkStatusBar()
                             
-                            // Show sync status indicator
-                            SyncStatusIndicator(
-                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
-                            )
-                            
                             InventoryNavHost(
                                 navController = navController,
                                 modifier = Modifier.weight(1f)
                             )
                         }
-                        
-                        // Small sync indicator in the corner
-                        SmallSyncIndicator(
-                            modifier = Modifier
-                                .align(Alignment.TopEnd)
-                                .padding(16.dp)
-                        )
                         
                         SnackbarHost(
                             hostState = snackbarHostState,
@@ -152,6 +138,39 @@ class MainActivity : ComponentActivity() {
         }
     }
     
+    private fun initializeFirebaseSafely() {
+        try {
+            Log.d("InventoryApp", "Safely initializing Firebase")
+            if (FirebaseApp.getApps(this).isEmpty()) {
+                // Initialize Firebase directly, avoiding any Crashlytics references
+                FirebaseApp.initializeApp(this)
+                Log.d("InventoryApp", "Firebase initialized without Crashlytics")
+            } else {
+                Log.d("InventoryApp", "Firebase already initialized")
+            }
+        } catch (e: Exception) {
+            Log.e("InventoryApp", "Failed to initialize Firebase", e)
+        }
+    }
+    
+    private fun signInAnonymously() {
+        // Sign in anonymously to Firebase for development testing
+        lifecycleScope.launch {
+            try {
+                val auth = FirebaseAuth.getInstance()
+                // Check if already signed in
+                if (auth.currentUser == null) {
+                    val result = auth.signInAnonymously().await()
+                    Log.d("InventoryApp", "Anonymous sign in successful: ${result.user?.uid}")
+                } else {
+                    Log.d("InventoryApp", "Already signed in as: ${auth.currentUser?.uid}")
+                }
+            } catch (e: Exception) {
+                Log.e("InventoryApp", "Anonymous sign in failed", e)
+            }
+        }
+    }
+    
     private fun setupNetworkMonitoring() {
         val connectivityManager = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
         
@@ -160,11 +179,6 @@ class MainActivity : ComponentActivity() {
             override fun onAvailable(network: Network) {
                 // Update the shared view model when network becomes available
                 SharedViewModel.updateConnectivity(true)
-                
-                // Try to sync when connection is restored
-                lifecycleScope.launch {
-                    OfflineCache.attemptSync(applicationContext)
-                }
             }
             
             override fun onLost(network: Network) {

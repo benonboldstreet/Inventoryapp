@@ -41,14 +41,14 @@ class AppContainerImpl(private val context: Context) : AppContainer {
     private val firebaseStorageUtils: FirebaseStorageUtils by lazy { FirebaseStorageUtils(firebaseConfig) }
 
     override val itemRepository: ItemRepository by lazy {
-        FirebaseItemRepository(firebaseConfig)
+        FirebaseItemRepository(firebaseConfig.firestore)
     }
     
     override val staffRepository: StaffRepository by lazy {
-        FirebaseStaffRepository(firebaseConfig)
+        FirebaseStaffRepository(firebaseConfig.firestore)
     }
     
     override val checkoutRepository: CheckoutRepository by lazy {
-        FirebaseCheckoutRepository(firebaseConfig, firebaseStorageUtils)
+        FirebaseCheckoutRepository(firebaseConfig.firestore, itemRepository)
     }
 } 

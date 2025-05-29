@@ -1,9 +1,8 @@
 package com.example.inventory.ui.viewmodel
 
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.inventory.InventoryApplication
+import androidx.hilt.navigation.compose.hiltViewModel
 
 /**
  * Utility functions for creating ViewModels in Compose
@@ -15,11 +14,7 @@ import com.example.inventory.InventoryApplication
  */
 @Composable
 fun itemViewModel(): ItemViewModel {
-    val context = LocalContext.current
-    val application = context.applicationContext as InventoryApplication
-    return viewModel(
-        factory = ItemViewModel.Companion.Factory(application.container.itemRepository)
-    )
+    return hiltViewModel<ItemViewModel>()
 }
 
 /**
@@ -27,11 +22,7 @@ fun itemViewModel(): ItemViewModel {
  */
 @Composable
 fun staffViewModel(): StaffViewModel {
-    val context = LocalContext.current
-    val application = context.applicationContext as InventoryApplication
-    return viewModel(
-        factory = StaffViewModel.Companion.Factory(application.container.staffRepository)
-    )
+    return hiltViewModel<StaffViewModel>()
 }
 
 /**
@@ -39,13 +30,14 @@ fun staffViewModel(): StaffViewModel {
  */
 @Composable
 fun checkoutViewModel(): CheckoutViewModel {
-    val context = LocalContext.current
-    val application = context.applicationContext as InventoryApplication
-    return viewModel(
-        factory = CheckoutViewModel.provideFactory(
-            application.container.checkoutRepository,
-            application.container.itemRepository,
-            application.container.staffRepository
-        )
-    )
-} 
+    return hiltViewModel<CheckoutViewModel>()
+}
+
+/**
+ * Create a HiltViewModel with proper dependencies
+ * This function was causing a recursive call - removing it
+ */
+// @Composable
+// inline fun <reified T : androidx.lifecycle.ViewModel> hiltViewModel(): T {
+//     return hiltViewModel()
+// } 

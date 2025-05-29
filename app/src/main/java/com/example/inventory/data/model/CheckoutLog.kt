@@ -1,65 +1,41 @@
 package com.example.inventory.data.model
 
-import com.google.firebase.firestore.DocumentId
-import com.google.firebase.Timestamp
-import java.util.UUID
-
 /**
- * Data model for checkout logs
- * 
- * Model designed for Firebase Firestore operations
+ * Represents a checkout log entry for an item checked out by a staff member
  */
 data class CheckoutLog(
-    @DocumentId val idString: String = "",
-    val itemIdString: String = "",
-    val staffIdString: String = "",
-    val checkOutTime: Long = System.currentTimeMillis(),
-    val checkInTime: Long? = null,
-    val photoPath: String? = null,
-    val status: String = "CHECKED_OUT", // Status of the checkout (CHECKED_OUT, CHECKED_IN, OVERDUE, etc.)
-    val lastModified: Long = System.currentTimeMillis()
+    val id: String,
+    val itemId: String,
+    val staffId: String,
+    val checkoutTimestamp: Long,
+    val checkinTimestamp: Long? = null,
+    val checkoutPhotoPath: String? = null,
+    val checkinPhotoPath: String? = null,
+    val notes: String = ""
 ) {
-    val id: UUID
-        get() = if (idString.isEmpty()) UUID.randomUUID() else UUID.fromString(idString)
+    // Helper properties for Firebase - keeping for backward compatibility
+    val idString: String get() = id
+    val itemIdString: String get() = itemId
+    val staffIdString: String get() = staffId
     
-    val itemId: UUID
-        get() = UUID.fromString(itemIdString)
+    // Calculated properties
+    val isCheckedIn: Boolean get() = checkinTimestamp != null
+    val durationMillis: Long? get() = if (checkinTimestamp != null) checkinTimestamp - checkoutTimestamp else null
     
-    val staffId: UUID
-        get() = UUID.fromString(staffIdString)
-    
-    // Helper function to safely get checkOutTime as Long
-    fun getCheckOutTimeAsLong(): Long {
-        return checkOutTime
+    // Helper methods for timestamp conversion
+    fun getCheckoutTimeAsString(): String {
+        return java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.getDefault())
+            .format(java.util.Date(checkoutTimestamp))
     }
     
-    // Helper function to safely get checkInTime as Long
-    fun getCheckInTimeAsLong(): Long? {
-        return checkInTime
+    fun getCheckinTimeAsString(): String? {
+        return checkinTimestamp?.let {
+            java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.getDefault())
+                .format(java.util.Date(it))
+        }
     }
     
-    // Helper function to safely get lastModified as Long
-    fun getLastModifiedTime(): Long {
-        return lastModified
-    }
-    
-    constructor(
-        id: UUID = UUID.randomUUID(),
-        itemId: UUID,
-        staffId: UUID,
-        checkOutTime: Long,
-        checkInTime: Long? = null,
-        photoPath: String? = null,
-        status: String = "CHECKED_OUT",
-        lastModified: Long = System.currentTimeMillis()
-    ) : this(
-        idString = id.toString(),
-        itemIdString = itemId.toString(),
-        staffIdString = staffId.toString(),
-        checkOutTime = checkOutTime,
-        checkInTime = checkInTime,
-        photoPath = photoPath,
-        status = status,
-        lastModified = lastModified
-    )
+    // Helper methods to get timestamps as longs
+    fun getCheckoutTimeAsLong(): Long = checkoutTimestamp
+    fun getCheckinTimeAsLong(): Long? = checkinTimestamp
 } 

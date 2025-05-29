@@ -3,246 +3,311 @@ package com.example.inventory.data.firebase
 import android.util.Log
 import com.example.inventory.data.model.CheckoutLog
 import com.example.inventory.data.repository.CheckoutRepository
+import com.example.inventory.data.repository.ItemRepository
+import com.google.firebase.Timestamp
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.Query
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.tasks.await
-import java.io.File
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
 
+/**
+ * Firebase implementation of CheckoutRepository
+ */
 @Singleton
 class FirebaseCheckoutRepository @Inject constructor(
-    firebaseConfig: FirebaseConfig,
-    private val storageUtils: FirebaseStorageUtils
+    private val firestore: FirebaseFirestore,
+    private val itemRepository: ItemRepository
 ) : CheckoutRepository {
-    private val checkoutsCollection = firebaseConfig.firestore.collection("checkouts")
+    
     private val TAG = "FirebaseCheckoutRepo"
-
+    private val collection = firestore.collection("checkout_logs")
+    
     override fun getAllCheckoutLogs(): Flow<List<CheckoutLog>> = flow {
         try {
-            Log.d(TAG, "Getting all checkout logs from Firestore")
-            val snapshot = checkoutsCollection.get().await()
-            Log.d(TAG, "Retrieved ${snapshot.documents.size} checkout documents from Firestore")
-            
-            val checkouts = snapshot.documents.mapNotNull { doc ->
+            val snapshot = collection.get().await()
+            val checkoutLogs = snapshot.documents.mapNotNull { doc ->
                 try {
-                    val checkout = doc.toObject(CheckoutLog::class.java)
-                    if (checkout != null) {
-                        Log.d(TAG, "Successfully converted checkout document: ${doc.id}")
-                    } else {
-                        Log.w(TAG, "Failed to convert checkout document to CheckoutLog object: ${doc.id}")
-                    }
-                    checkout
+                    CheckoutLog(
+                        id = UUID.fromString(doc.id),
+                        itemId = UUID.fromString(doc.getString("itemIdString") ?: return@mapNotNull null),
+                        staffId = UUID.fromString(doc.getString("staffIdString") ?: return@mapNotNull null),
+                        checkoutTimestamp = doc.getLong("checkoutTimestamp") ?: System.currentTimeMillis(),
+                        checkinTimestamp = doc.getLong("checkinTimestamp"),
+                        checkoutPhotoPath = doc.getString("checkoutPhotoPath"),
+                        checkinPhotoPath = doc.getString("checkinPhotoPath"),
+                        notes = doc.getString("notes") ?: ""
+                    )
                 } catch (e: Exception) {
-                    Log.e(TAG, "Error converting checkout document ${doc.id}: ${e.message}", e)
+                    Log.e(TAG, "Error mapping document to CheckoutLog: ${e.message}", e)
                     null
                 }
             }
-            
-            Log.d(TAG, "Emitting ${checkouts.size} checkout logs")
-            emit(checkouts)
+            emit(checkoutLogs)
         } catch (e: Exception) {
             Log.e(TAG, "Error getting all checkout logs: ${e.message}", e)
-            // Still emit an empty list so the UI can handle it gracefully
             emit(emptyList())
         }
     }
-
-    override fun getCheckoutLogsByItemId(itemId: UUID): Flow<List<CheckoutLog>> = flow {
+    
+    override fun getCheckoutLogById(id: UUID): Flow<CheckoutLog?> = flow {
         try {
-            Log.d(TAG, "Getting checkout logs for item ID: $itemId")
-            val snapshot = checkoutsCollection.whereEqualTo("itemIdString", itemId.toString()).get().await()
-            val checkouts = snapshot.documents.mapNotNull { it.toObject(CheckoutLog::class.java) }
-            Log.d(TAG, "Found ${checkouts.size} checkout logs for item: $itemId")
-            emit(checkouts)
-        } catch (e: Exception) {
-            Log.e(TAG, "Error getting checkout logs for item $itemId: ${e.message}", e)
-            emit(emptyList())
-        }
-    }
-
-    override fun getCheckoutLogsByStaffId(staffId: UUID): Flow<List<CheckoutLog>> = flow {
-        try {
-            Log.d(TAG, "Getting checkout logs for staff ID: $staffId")
-            val snapshot = checkoutsCollection.whereEqualTo("staffIdString", staffId.toString()).get().await()
-            val checkouts = snapshot.documents.mapNotNull { it.toObject(CheckoutLog::class.java) }
-            Log.d(TAG, "Found ${checkouts.size} checkout logs for staff: $staffId")
-            emit(checkouts)
-        } catch (e: Exception) {
-            Log.e(TAG, "Error getting checkout logs for staff $staffId: ${e.message}", e)
-            emit(emptyList())
-        }
-    }
-
-    override fun getCurrentCheckouts(): Flow<List<CheckoutLog>> = flow {
-        try {
-            Log.d(TAG, "Getting current checkouts (with null checkInTime)")
-            val snapshot = checkoutsCollection.whereEqualTo("checkInTime", null).get().await()
-            val checkouts = snapshot.documents.mapNotNull { it.toObject(CheckoutLog::class.java) }
-            Log.d(TAG, "Found ${checkouts.size} current checkouts")
-            emit(checkouts)
-        } catch (e: Exception) {
-            Log.e(TAG, "Error getting current checkouts: ${e.message}", e)
-            emit(emptyList())
-        }
-    }
-
-    override suspend fun getCurrentCheckoutForItem(itemId: UUID): CheckoutLog? {
-        try {
-            Log.d(TAG, "Getting current checkout for item ID: $itemId")
-            val snapshot = checkoutsCollection
-                .whereEqualTo("itemIdString", itemId.toString())
-                .whereEqualTo("checkInTime", null)
-                .get()
-                .await()
-            
-            return snapshot.documents.firstOrNull()?.let { doc ->
+            val doc = collection.document(id.toString()).get().await()
+            if (doc.exists()) {
                 try {
-                    val checkout = doc.toObject(CheckoutLog::class.java)
-                    if (checkout != null) {
-                        Log.d(TAG, "Found current checkout for item $itemId: ${doc.id}")
-                    } else {
-                        Log.w(TAG, "Failed to convert checkout document to CheckoutLog: ${doc.id}")
-                    }
-                    checkout
+                    val checkoutLog = CheckoutLog(
+                        id = UUID.fromString(doc.id),
+                        itemId = UUID.fromString(doc.getString("itemIdString") ?: throw IllegalStateException("Missing itemId")),
+                        staffId = UUID.fromString(doc.getString("staffIdString") ?: throw IllegalStateException("Missing staffId")),
+                        checkoutTimestamp = doc.getLong("checkoutTimestamp") ?: System.currentTimeMillis(),
+                        checkinTimestamp = doc.getLong("checkinTimestamp"),
+                        checkoutPhotoPath = doc.getString("checkoutPhotoPath"),
+                        checkinPhotoPath = doc.getString("checkinPhotoPath"),
+                        notes = doc.getString("notes") ?: ""
+                    )
+                    emit(checkoutLog)
                 } catch (e: Exception) {
-                    Log.e(TAG, "Error converting checkout document ${doc.id}: ${e.message}", e)
+                    Log.e(TAG, "Error mapping document to CheckoutLog: ${e.message}", e)
+                    emit(null)
+                }
+            } else {
+                emit(null)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error getting checkout log by ID: ${e.message}", e)
+            emit(null)
+        }
+    }
+    
+    override fun getCheckoutsByItemId(itemId: UUID): Flow<List<CheckoutLog>> = flow {
+        try {
+            val snapshot = collection.whereEqualTo("itemIdString", itemId.toString()).get().await()
+            val checkoutLogs = snapshot.documents.mapNotNull { doc ->
+                try {
+                    CheckoutLog(
+                        id = UUID.fromString(doc.id),
+                        itemId = UUID.fromString(doc.getString("itemIdString") ?: return@mapNotNull null),
+                        staffId = UUID.fromString(doc.getString("staffIdString") ?: return@mapNotNull null),
+                        checkoutTimestamp = doc.getLong("checkoutTimestamp") ?: System.currentTimeMillis(),
+                        checkinTimestamp = doc.getLong("checkinTimestamp"),
+                        checkoutPhotoPath = doc.getString("checkoutPhotoPath"),
+                        checkinPhotoPath = doc.getString("checkinPhotoPath"),
+                        notes = doc.getString("notes") ?: ""
+                    )
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error mapping document to CheckoutLog: ${e.message}", e)
                     null
                 }
             }
+            emit(checkoutLogs)
         } catch (e: Exception) {
-            Log.e(TAG, "Error getting current checkout for item $itemId: ${e.message}", e)
-            return null
+            Log.e(TAG, "Error getting checkout logs by item ID: ${e.message}", e)
+            emit(emptyList())
         }
     }
-
-    override suspend fun getCheckoutLogById(id: UUID): CheckoutLog? {
+    
+    override fun getCheckoutsByStaffId(staffId: UUID): Flow<List<CheckoutLog>> = flow {
         try {
-            Log.d(TAG, "Getting checkout log by ID: $id")
-            val doc = checkoutsCollection.document(id.toString()).get().await()
-            
-            if (!doc.exists()) {
-                Log.w(TAG, "Checkout log with ID $id not found")
-                return null
+            val snapshot = collection.whereEqualTo("staffIdString", staffId.toString()).get().await()
+            val checkoutLogs = snapshot.documents.mapNotNull { doc ->
+                try {
+                    CheckoutLog(
+                        id = UUID.fromString(doc.id),
+                        itemId = UUID.fromString(doc.getString("itemIdString") ?: return@mapNotNull null),
+                        staffId = UUID.fromString(doc.getString("staffIdString") ?: return@mapNotNull null),
+                        checkoutTimestamp = doc.getLong("checkoutTimestamp") ?: System.currentTimeMillis(),
+                        checkinTimestamp = doc.getLong("checkinTimestamp"),
+                        checkoutPhotoPath = doc.getString("checkoutPhotoPath"),
+                        checkinPhotoPath = doc.getString("checkinPhotoPath"),
+                        notes = doc.getString("notes") ?: ""
+                    )
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error mapping document to CheckoutLog: ${e.message}", e)
+                    null
+                }
             }
-            
-            val checkout = doc.toObject(CheckoutLog::class.java)
-            if (checkout == null) {
-                Log.w(TAG, "Failed to convert checkout document to CheckoutLog: ${doc.id}")
-            } else {
-                Log.d(TAG, "Successfully retrieved checkout log: $id")
-            }
-            return checkout
+            emit(checkoutLogs)
         } catch (e: Exception) {
-            Log.e(TAG, "Error getting checkout log by ID $id: ${e.message}", e)
-            return null
+            Log.e(TAG, "Error getting checkout logs by staff ID: ${e.message}", e)
+            emit(emptyList())
         }
     }
-
+    
+    override fun getActiveCheckouts(): Flow<List<CheckoutLog>> = flow {
+        try {
+            val snapshot = collection.whereEqualTo("checkinTimestamp", null).get().await()
+            val checkoutLogs = snapshot.documents.mapNotNull { doc ->
+                try {
+                    CheckoutLog(
+                        id = UUID.fromString(doc.id),
+                        itemId = UUID.fromString(doc.getString("itemIdString") ?: return@mapNotNull null),
+                        staffId = UUID.fromString(doc.getString("staffIdString") ?: return@mapNotNull null),
+                        checkoutTimestamp = doc.getLong("checkoutTimestamp") ?: System.currentTimeMillis(),
+                        checkinTimestamp = null,
+                        checkoutPhotoPath = doc.getString("checkoutPhotoPath"),
+                        checkinPhotoPath = null,
+                        notes = doc.getString("notes") ?: ""
+                    )
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error mapping document to CheckoutLog: ${e.message}", e)
+                    null
+                }
+            }
+            emit(checkoutLogs)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error getting active checkouts: ${e.message}", e)
+            emit(emptyList())
+        }
+    }
+    
     override suspend fun insertCheckoutLog(checkoutLog: CheckoutLog) {
         try {
-            Log.d(TAG, "Inserting new checkout log with ID: ${checkoutLog.idString}")
-            checkoutsCollection.document(checkoutLog.idString).set(checkoutLog).await()
-            Log.d(TAG, "Successfully inserted checkout log: ${checkoutLog.idString}")
+            val data = mapOf(
+                "itemIdString" to checkoutLog.itemIdString,
+                "staffIdString" to checkoutLog.staffIdString,
+                "checkoutTimestamp" to checkoutLog.checkoutTimestamp,
+                "checkinTimestamp" to checkoutLog.checkinTimestamp,
+                "checkoutPhotoPath" to checkoutLog.checkoutPhotoPath,
+                "checkinPhotoPath" to checkoutLog.checkinPhotoPath,
+                "notes" to checkoutLog.notes
+            )
+            
+            collection.document(checkoutLog.idString).set(data).await()
+            Log.d(TAG, "Checkout log inserted: ${checkoutLog.idString}")
+            
+            // Update the item status in the items collection
+            updateItemStatus(checkoutLog.itemId, "Checked Out")
         } catch (e: Exception) {
             Log.e(TAG, "Error inserting checkout log: ${e.message}", e)
             throw e
         }
     }
-
+    
     override suspend fun updateCheckoutLog(checkoutLog: CheckoutLog) {
         try {
-            Log.d(TAG, "Updating checkout log with ID: ${checkoutLog.idString}")
-            checkoutsCollection.document(checkoutLog.idString).set(checkoutLog).await()
-            Log.d(TAG, "Successfully updated checkout log: ${checkoutLog.idString}")
+            val data = mapOf(
+                "itemIdString" to checkoutLog.itemIdString,
+                "staffIdString" to checkoutLog.staffIdString,
+                "checkoutTimestamp" to checkoutLog.checkoutTimestamp,
+                "checkinTimestamp" to checkoutLog.checkinTimestamp,
+                "checkoutPhotoPath" to checkoutLog.checkoutPhotoPath,
+                "checkinPhotoPath" to checkoutLog.checkinPhotoPath,
+                "notes" to checkoutLog.notes
+            )
+            
+            collection.document(checkoutLog.idString).update(data).await()
+            Log.d(TAG, "Checkout log updated: ${checkoutLog.idString}")
+            
+            // Update the item status if it was checked in
+            if (checkoutLog.checkinTimestamp != null) {
+                updateItemStatus(checkoutLog.itemId, "Available")
+            }
         } catch (e: Exception) {
             Log.e(TAG, "Error updating checkout log: ${e.message}", e)
             throw e
         }
     }
-
+    
     override suspend fun deleteCheckoutLog(checkoutLog: CheckoutLog) {
         try {
-            Log.d(TAG, "Deleting checkout log with ID: ${checkoutLog.idString}")
-            checkoutsCollection.document(checkoutLog.idString).delete().await()
-            Log.d(TAG, "Successfully deleted checkout log: ${checkoutLog.idString}")
+            collection.document(checkoutLog.idString).delete().await()
+            Log.d(TAG, "Checkout log deleted: ${checkoutLog.idString}")
         } catch (e: Exception) {
             Log.e(TAG, "Error deleting checkout log: ${e.message}", e)
             throw e
         }
     }
-
-    override suspend fun checkOutItem(itemId: UUID, staffId: UUID): CheckoutLog {
+    
+    override suspend fun checkOutItem(itemId: UUID, staffId: UUID, notes: String): CheckoutLog {
         try {
-            Log.d(TAG, "Creating new checkout for item $itemId and staff $staffId")
-            val newId = UUID.randomUUID()
-            val checkout = CheckoutLog(
-                idString = newId.toString(),
-                itemIdString = itemId.toString(),
-                staffIdString = staffId.toString(),
-                checkOutTime = com.google.firebase.Timestamp.now(),
-                checkInTime = null,
-                lastModified = com.google.firebase.Timestamp.now()
+            // Create a new checkout log
+            val checkoutLog = CheckoutLog(
+                id = UUID.randomUUID(),
+                itemId = itemId,
+                staffId = staffId,
+                checkoutTimestamp = System.currentTimeMillis(),
+                checkinTimestamp = null,
+                checkoutPhotoPath = null,
+                checkinPhotoPath = null,
+                notes = notes
             )
-            checkoutsCollection.document(checkout.idString).set(checkout).await()
-            Log.d(TAG, "Successfully checked out item $itemId to staff $staffId with checkout ID ${checkout.idString}")
-            return checkout
+            
+            // Insert the checkout log
+            insertCheckoutLog(checkoutLog)
+            
+            // Update the item status
+            updateItemStatus(itemId, "Checked Out")
+            
+            return checkoutLog
         } catch (e: Exception) {
-            Log.e(TAG, "Error checking out item $itemId to staff $staffId: ${e.message}", e)
+            Log.e(TAG, "Error checking out item: ${e.message}", e)
             throw e
         }
     }
-
-    override suspend fun checkOutItemWithPhoto(itemId: UUID, staffId: UUID, photoPath: String): CheckoutLog {
+    
+    override suspend fun checkInItem(checkoutLogId: UUID, notes: String): CheckoutLog {
         try {
-            val newId = UUID.randomUUID()
-            Log.d(TAG, "Creating new checkout with photo for item $itemId and staff $staffId")
+            // Get the current checkout log
+            val checkoutLogFlow = getCheckoutLogById(checkoutLogId)
+            var checkoutLog: CheckoutLog? = null
             
-            // First, upload the photo to Firebase Storage
-            val photoFile = File(photoPath)
-            if (!photoFile.exists()) {
-                Log.e(TAG, "Photo file does not exist: $photoPath")
-                throw IllegalArgumentException("Photo file does not exist: $photoPath")
+            // Collect the flow to get the checkout log
+            checkoutLogFlow.collect {
+                checkoutLog = it
             }
             
-            // Upload the photo and get the download URL
-            val downloadUrl = storageUtils.uploadCheckoutPhoto(photoFile)
-            Log.d(TAG, "Photo uploaded to Firebase Storage: $downloadUrl")
+            if (checkoutLog == null) {
+                throw IllegalArgumentException("Checkout log not found: $checkoutLogId")
+            }
             
-            // Create checkout log with the download URL
-            val checkout = CheckoutLog(
-                idString = newId.toString(),
-                itemIdString = itemId.toString(),
-                staffIdString = staffId.toString(),
-                checkOutTime = com.google.firebase.Timestamp.now(),
-                checkInTime = null,
-                photoPath = downloadUrl, // Use the download URL instead of local path
-                lastModified = com.google.firebase.Timestamp.now()
+            // Update the checkout log with check-in information
+            val updatedCheckoutLog = checkoutLog!!.copy(
+                checkinTimestamp = System.currentTimeMillis(),
+                notes = if (notes.isNotBlank()) "${checkoutLog!!.notes} | Check-in: $notes" else checkoutLog!!.notes
             )
             
-            // Save the checkout log in Firestore
-            checkoutsCollection.document(checkout.idString).set(checkout).await()
-            Log.d(TAG, "Checkout log created with photo: ${checkout.idString}")
+            // Update the checkout log
+            updateCheckoutLog(updatedCheckoutLog)
             
-            return checkout
+            // Update the item status
+            updateItemStatus(checkoutLog!!.itemId, "Available")
+            
+            return updatedCheckoutLog
         } catch (e: Exception) {
-            Log.e(TAG, "Error creating checkout with photo for item $itemId and staff $staffId: ${e.message}", e)
+            Log.e(TAG, "Error checking in item: ${e.message}", e)
             throw e
         }
     }
-
-    override suspend fun checkInItem(checkoutLog: CheckoutLog): CheckoutLog {
+    
+    override suspend fun refreshFromFirebase() {
+        // This method is already using Firebase directly, so no action needed
+        Log.d(TAG, "Using Firebase directly, no refresh needed")
+    }
+    
+    /**
+     * Helper method to update an item's status
+     */
+    private suspend fun updateItemStatus(itemId: UUID, status: String) {
         try {
-            Log.d(TAG, "Checking in item for checkout log: ${checkoutLog.idString}")
-            val updated = checkoutLog.copy(checkInTime = com.google.firebase.Timestamp.now())
-            checkoutsCollection.document(updated.idString).set(updated).await()
-            Log.d(TAG, "Successfully checked in item for checkout log: ${updated.idString}")
-            return updated
+            // Get the item
+            var itemObj: com.example.inventory.data.model.Item? = null
+            itemRepository.getItemById(itemId).collect {
+                itemObj = it
+            }
+            
+            if (itemObj != null) {
+                // Update the item status
+                val updatedItem = itemObj!!.copy(status = status)
+                itemRepository.updateItem(updatedItem)
+                Log.d(TAG, "Updated item ${itemId} status to $status")
+            } else {
+                Log.w(TAG, "Item not found: $itemId")
+            }
         } catch (e: Exception) {
-            Log.e(TAG, "Error checking in item for checkout log ${checkoutLog.idString}: ${e.message}", e)
-            throw e
+            Log.e(TAG, "Error updating item status: ${e.message}", e)
         }
     }
 } 

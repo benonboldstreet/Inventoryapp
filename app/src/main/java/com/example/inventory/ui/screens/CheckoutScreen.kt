@@ -87,7 +87,7 @@ fun CheckoutScreen(
                         checkout = checkout,
                         onCheckIn = {
                             coroutineScope.launch {
-                                val result = checkoutViewModel.checkInItem(checkout)
+                                val result = checkoutViewModel.checkinItem(checkout)
                                 if (!result.isSuccess) {
                                     // Handle error - you could add error state handling here
                                     android.util.Log.e("CheckoutScreen", "Error checking in item: ${result.exceptionOrNull()?.message}")
@@ -147,7 +147,7 @@ fun CheckoutCard(
             
             Row {
                 Text("Checked Out: ", fontWeight = FontWeight.Bold)
-                Text(formatTimestamp(checkout.getCheckOutTimeAsLong()))
+                Text(formatTimestamp(checkout.checkoutTimestamp))
             }
             
             Spacer(modifier = Modifier.height(8.dp))

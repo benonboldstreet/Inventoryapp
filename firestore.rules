@@ -1,0 +1,86 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isAdmin() {
+      return isAuthenticated() && 
+        exists(/databases/$(database)/documents/staff/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/staff/$(request.auth.uid)).data.role == 'Admin';
+    }
+    
+    function isStaffMember() {
+      return isAuthenticated() && 
+        exists(/databases/$(database)/documents/staff/$(request.auth.uid));
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    function isValidItem() {
+      let requiredFields = ['idString', 'name', 'category', 'type', 'barcode', 'condition', 'status', 'description', 'isActive', 'lastModified'];
+      let item = request.resource.data;
+      
+      return item.keys().hasAll(requiredFields) &&
+        item.name is string && item.name.size() > 0 &&
+        item.category is string &&
+        item.type is string &&
+        item.condition is string &&
+        item.status is string &&
+        item.barcode is string &&
+        item.description is string &&
+        item.isActive is bool &&
+        item.lastModified is number;
+    }
+    
+    function isValidStaff() {
+      let requiredFields = ['idString', 'name', 'department', 'position', 'email', 'phone', 'isActive', 'lastModified', 'role'];
+      let staff = request.resource.data;
+      
+      return staff.keys().hasAll(requiredFields) &&
+        staff.name is string && staff.name.size() > 0 &&
+        staff.email is string && staff.email.matches('^[^@]+@[^@]+\\.[^@]+$') &&
+        staff.position is string &&
+        staff.department is string &&
+        staff.phone is string &&
+        staff.isActive is bool &&
+        staff.lastModified is number &&
+        staff.role is string;
+    }
+
+    function isValidCheckoutLog() {
+      let requiredFields = ['idString', 'itemIdString', 'staffIdString', 'checkoutTimestamp', 'notes'];
+      let checkout = request.resource.data;
+      
+      return checkout.keys().hasAll(requiredFields) &&
+        checkout.itemIdString is string &&
+        checkout.staffIdString is string &&
+        checkout.checkoutTimestamp is number &&
+        checkout.notes is string;
+    }
+
+    // Items collection rules
+    match /items/{itemId} {
+      allow read, write: if true; // Temporarily allow all access for testing
+    }
+    
+    // Staff collection rules
+    match /staff/{staffId} {
+      allow read, write: if true; // Temporarily allow all access for testing
+    }
+    
+    // Checkout logs collection rules
+    match /checkout_logs/{checkoutId} {
+      allow read, write: if true; // Temporarily allow all access for testing
+    }
+    
+    // Default deny all other access
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

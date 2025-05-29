@@ -22,7 +22,7 @@ object StaffMapper {
             val lastModified = getLong("lastModified") ?: System.currentTimeMillis()
             
             Staff(
-                idString = idString,
+                id = UUID.fromString(idString),
                 name = name,
                 department = department,
                 email = email,

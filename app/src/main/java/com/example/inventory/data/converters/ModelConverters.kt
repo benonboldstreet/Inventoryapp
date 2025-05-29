@@ -15,13 +15,10 @@ import java.util.UUID
 object ModelConverters {
     /**
      * Utility function to convert a String ID to a UUID safely
+     * @throws IllegalArgumentException if the string is not a valid UUID
      */
     fun stringToUuid(idString: String): UUID {
-        return try {
-            UUID.fromString(idString)
-        } catch (e: Exception) {
-            UUID.randomUUID()
-        }
+        return UUID.fromString(idString)
     }
     
     /**

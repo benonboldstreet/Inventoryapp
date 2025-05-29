@@ -5,36 +5,29 @@ import kotlinx.coroutines.flow.Flow
 import java.util.UUID
 
 /**
- * Repository interface for managing Staff data operations
- * 
- * This defines the contract for staff repository implementations,
- * whether they're using local storage or cloud storage.
+ * Repository interface for staff operations
  */
 interface StaffRepository {
+    
     /**
-     * Get all staff members as a Flow
+     * Get all staff members
      */
     fun getAllStaff(): Flow<List<Staff>>
     
     /**
-     * Get active staff as a Flow
+     * Get only active staff members
      */
     fun getActiveStaff(): Flow<List<Staff>>
     
     /**
-     * Get staff by department as a Flow
+     * Get a staff member by ID
      */
-    fun getStaffByDepartment(department: String): Flow<List<Staff>>
+    fun getStaffById(id: UUID): Flow<Staff?>
     
     /**
-     * Get staff by ID
+     * Get staff members by role
      */
-    suspend fun getStaffById(id: UUID): Staff?
-    
-    /**
-     * Get staff by email
-     */
-    suspend fun getStaffByEmail(email: String): Staff?
+    fun getStaffByRole(role: String): Flow<List<Staff>>
     
     /**
      * Insert a new staff member
@@ -42,9 +35,14 @@ interface StaffRepository {
     suspend fun insertStaff(staff: Staff)
     
     /**
+     * Create a new staff member and return it
+     */
+    suspend fun createStaff(staff: Staff): Staff
+    
+    /**
      * Update an existing staff member
      */
-    suspend fun updateStaff(staff: Staff)
+    suspend fun updateStaff(staff: Staff): Staff
     
     /**
      * Delete a staff member
@@ -52,7 +50,17 @@ interface StaffRepository {
     suspend fun deleteStaff(staff: Staff)
     
     /**
+     * Archive a staff member (mark as inactive)
+     */
+    suspend fun archiveStaff(staffId: UUID): Staff
+    
+    /**
      * Refresh staff data from Firebase
      */
     suspend fun refreshFromFirebase()
+    
+    /**
+     * Get a staff member by Firebase UID
+     */
+    suspend fun getStaffByFirebaseUid(uid: String): Staff?
 } 

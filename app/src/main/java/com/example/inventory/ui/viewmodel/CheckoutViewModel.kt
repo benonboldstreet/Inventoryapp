@@ -2,12 +2,11 @@ package com.example.inventory.ui.viewmodel
 
 import android.util.Log
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.inventory.data.model.CheckoutLog
 import com.example.inventory.data.model.Item
 import com.example.inventory.data.model.Staff
-import com.example.inventory.data.repository.CheckoutLogRepository
+import com.example.inventory.data.repository.CheckoutRepository
 import com.example.inventory.data.repository.ItemRepository
 import com.example.inventory.data.repository.StaffRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -18,7 +17,7 @@ import javax.inject.Inject
 
 @HiltViewModel
 class CheckoutViewModel @Inject constructor(
-    private val checkoutLogRepository: CheckoutLogRepository,
+    val checkoutRepository: CheckoutRepository,
     private val itemRepository: ItemRepository,
     private val staffRepository: StaffRepository
 ) : ViewModel() {
@@ -49,12 +48,18 @@ class CheckoutViewModel @Inject constructor(
     private fun loadActiveCheckouts() {
         viewModelScope.launch {
             try {
-                checkoutLogRepository.getActiveCheckouts()
+                checkoutRepository.getActiveCheckouts()
+                    .catch { e ->
+                        Log.e(TAG, "Error loading active checkouts: ${e.message}", e)
+                        _uiState.value = CheckoutUiState.Error("Failed to load active checkouts: ${e.message}")
+                    }
                     .collect { checkouts ->
                         _activeCheckouts.value = checkouts
+                        _uiState.value = CheckoutUiState.Success
                     }
             } catch (e: Exception) {
                 Log.e(TAG, "Error loading active checkouts: ${e.message}", e)
+                _uiState.value = CheckoutUiState.Error("Failed to load active checkouts: ${e.message}")
             }
         }
     }
@@ -63,11 +68,16 @@ class CheckoutViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 itemRepository.getAllItems()
+                    .catch { e ->
+                        Log.e(TAG, "Error loading items: ${e.message}", e)
+                        _uiState.value = CheckoutUiState.Error("Failed to load items: ${e.message}")
+                    }
                     .collect { items ->
                         _items.value = items
                     }
             } catch (e: Exception) {
                 Log.e(TAG, "Error loading items: ${e.message}", e)
+                _uiState.value = CheckoutUiState.Error("Failed to load items: ${e.message}")
             }
         }
     }
@@ -76,30 +86,93 @@ class CheckoutViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 staffRepository.getAllStaff()
+                    .catch { e ->
+                        Log.e(TAG, "Error loading staff: ${e.message}", e)
+                        _uiState.value = CheckoutUiState.Error("Failed to load staff: ${e.message}")
+                    }
                     .collect { staff ->
                         _staff.value = staff
                     }
             } catch (e: Exception) {
                 Log.e(TAG, "Error loading staff: ${e.message}", e)
+                _uiState.value = CheckoutUiState.Error("Failed to load staff: ${e.message}")
             }
         }
     }
 
-    fun getCheckoutLogsByItem(itemId: UUID): Flow<List<CheckoutLog>> {
-        return checkoutLogRepository.getCheckoutLogsByItem(itemId)
+    // Checkout Operations
+    suspend fun checkoutItem(itemId: UUID, staffId: UUID, photoPath: String? = null): Result<CheckoutLog> {
+        return try {
+            _uiState.value = CheckoutUiState.Loading
+
+            // Verify item exists
+            val item = itemRepository.getItemById(itemId).first()
+            if (item == null) {
+                Log.e(TAG, "Item not found: $itemId")
+                return Result.failure(IllegalArgumentException("Item not found: $itemId"))
+            }
+
+            // Verify staff exists
+            val staff = staffRepository.getStaffById(staffId).first()
+            if (staff == null) {
+                Log.e(TAG, "Staff not found: $staffId")
+                return Result.failure(IllegalArgumentException("Staff not found: $staffId"))
+            }
+
+            // Check if item is already checked out
+            val currentCheckout = getCurrentCheckoutForItem(itemId)
+            if (currentCheckout != null) {
+                Log.e(TAG, "Item is already checked out: $itemId")
+                return Result.failure(IllegalStateException("Item is already checked out: $itemId"))
+            }
+
+            // Perform checkout
+            val result = checkoutRepository.checkOutItem(itemId, staffId, notes = photoPath ?: "")
+            _uiState.value = CheckoutUiState.Success
+            Result.success(result)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error checking out item: ${e.message}", e)
+            _uiState.value = CheckoutUiState.Error("Failed to checkout item: ${e.message}")
+            Result.failure(e)
+        }
     }
 
-    fun getCheckoutLogsByStaff(staffId: UUID): Flow<List<CheckoutLog>> {
-        return checkoutLogRepository.getCheckoutLogsByStaff(staffId)
+    suspend fun checkinItem(checkoutLog: CheckoutLog): Result<Unit> {
+        return try {
+            _uiState.value = CheckoutUiState.Loading
+            val updatedLog = checkoutRepository.checkInItem(checkoutLog.id, "")
+            _uiState.value = CheckoutUiState.Success
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error checking in item: ${e.message}", e)
+            _uiState.value = CheckoutUiState.Error("Failed to check in item: ${e.message}")
+            Result.failure(e)
+        }
     }
 
-    fun getCheckoutLogsByDateRange(startDate: Date, endDate: Date): Flow<List<CheckoutLog>> {
-        return checkoutLogRepository.getCheckoutLogsByDateRange(startDate.time, endDate.time)
+    // Query Operations
+    fun getCheckoutLogsByItem(itemId: UUID): Flow<List<CheckoutLog>> =
+        checkoutRepository.getCheckoutsByItemId(itemId)
+
+    fun getCheckoutLogsByStaff(staffId: UUID): Flow<List<CheckoutLog>> =
+        checkoutRepository.getCheckoutsByStaffId(staffId)
+
+    fun getCheckoutLogsByDateRange(startDate: Date, endDate: Date): Flow<List<CheckoutLog>> = flow {
+        // Convert dates to longs and filter logs
+        val startTime = startDate.time
+        val endTime = endDate.time
+        
+        val allLogs = checkoutRepository.getAllCheckoutLogs().first()
+        val filteredLogs = allLogs.filter { log ->
+            log.checkoutTimestamp >= startTime && log.checkoutTimestamp <= endTime
+        }
+        
+        emit(filteredLogs)
     }
 
     suspend fun getCurrentCheckoutForItem(itemId: UUID): CheckoutLog? {
         return try {
-            checkoutLogRepository.getActiveCheckouts()
+            checkoutRepository.getActiveCheckouts()
                 .first()
                 .find { it.itemId == itemId }
         } catch (e: Exception) {
@@ -108,75 +181,12 @@ class CheckoutViewModel @Inject constructor(
         }
     }
 
-    suspend fun checkoutItem(itemId: UUID, staffId: UUID, photoPath: String?) {
-        try {
-            // Verify item exists
-            val item = itemRepository.getItemById(itemId)
-            if (item == null) {
-                Log.e(TAG, "Item not found: $itemId")
-                return
-            }
-
-            // Verify staff exists
-            val staff = staffRepository.getStaffById(staffId)
-            if (staff == null) {
-                Log.e(TAG, "Staff not found: $staffId")
-                return
-            }
-
-            // Check if item is already checked out
-            val currentCheckout = getCurrentCheckoutForItem(itemId)
-            if (currentCheckout != null) {
-                Log.e(TAG, "Item is already checked out: $itemId")
-                return
-            }
-
-            // Perform checkout
-            checkoutLogRepository.checkoutItem(itemId, staffId, photoPath)
-        } catch (e: Exception) {
-            Log.e(TAG, "Error checking out item: ${e.message}", e)
-            throw e
-        }
-    }
-
-    suspend fun checkinItem(checkoutLog: CheckoutLog) {
-        try {
-            checkoutLogRepository.checkinItem(checkoutLog)
-        } catch (e: Exception) {
-            Log.e(TAG, "Error checking in item: ${e.message}", e)
-            throw e
-        }
-    }
-
-    fun getItemById(id: UUID): Flow<Item?> {
-        return itemRepository.getItemById(id)
-    }
-
-    fun getStaffById(id: UUID): Flow<Staff?> {
-        return staffRepository.getStaffById(id)
-    }
-
-    fun loadStaffCheckouts(staffId: UUID) {
-        viewModelScope.launch {
-            try {
-                checkoutLogRepository.getCheckoutLogsByStaff(staffId).collect { checkouts ->
-                    _activeCheckouts.value = checkouts
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to load staff checkouts: ${e.message}", e)
-                _uiState.value = CheckoutUiState.Error("Failed to load staff checkouts: ${e.message}")
-            }
-        }
-    }
-
+    // Report Generation
     fun generateDateRangeReport(startDate: Date, endDate: Date) {
         viewModelScope.launch {
             try {
                 _uiState.value = CheckoutUiState.Loading
-                checkoutLogRepository.getCheckoutLogsByDateRange(
-                    startDate.time,
-                    endDate.time
-                ).collect { checkouts ->
+                getCheckoutLogsByDateRange(startDate, endDate).collect { checkouts ->
                     _uiState.value = CheckoutUiState.DateRangeReport(checkouts)
                 }
             } catch (e: Exception) {
@@ -190,7 +200,7 @@ class CheckoutViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 _uiState.value = CheckoutUiState.Loading
-                checkoutLogRepository.getCheckoutLogsByItem(itemId).collect { checkouts ->
+                checkoutRepository.getCheckoutsByItemId(itemId).collect { checkouts ->
                     _uiState.value = CheckoutUiState.ItemHistoryReport(checkouts)
                 }
             } catch (e: Exception) {
@@ -200,97 +210,41 @@ class CheckoutViewModel @Inject constructor(
         }
     }
 
-    // Function to get all checkout logs
+    // Report Operations
     fun getAllCheckoutLogs(): Flow<List<CheckoutLog>> {
-        return checkoutLogRepository.getAllCheckoutLogs()
-    }
-    
-    // Get all items
-    fun getAllItems(): Flow<List<Item>> {
-        return itemRepository.getAllItems()
-    }
-    
-    // Get all staff
-    fun getAllStaff(): Flow<List<Staff>> {
-        return staffRepository.getAllStaff()
-    }
-
-    // Get checkout logs by item ID
-    fun getCheckoutLogsByItemId(itemId: UUID): Flow<List<CheckoutLog>> {
-        return checkoutLogRepository.getCheckoutLogsByItem(itemId)
-    }
-
-    // Get checkout logs by staff ID
-    fun getCheckoutLogsByStaffId(staffId: UUID): Flow<List<CheckoutLog>> {
-        return checkoutLogRepository.getCheckoutLogsByStaff(staffId)
-    }
-
-    // Get current checkouts
-    fun getCurrentCheckouts(): Flow<List<CheckoutLog>> {
-        return checkoutLogRepository.getActiveCheckouts()
-    }
-
-    // Get checkout logs by item - convenience method for UI
-    fun getCheckoutLogsByItem(itemId: UUID): Flow<List<CheckoutLog>> = 
-        checkoutLogRepository.getCheckoutLogsByItem(itemId)
-    
-    // Get checkout logs by staff - convenience method for UI
-    fun getCheckoutsByStaffId(staffId: UUID): Flow<List<CheckoutLog>> =
-        checkoutLogRepository.getCheckoutLogsByStaff(staffId)
-
-    // Check out an item to a staff member
-    suspend fun checkOutItem(itemId: UUID, staffId: UUID): Result<CheckoutLog> {
-        return try {
-            Log.d(TAG, "Checking out item $itemId to staff $staffId")
-            val result = checkoutLogRepository.checkoutItem(itemId, staffId, null)
-            Log.d(TAG, "Successfully checked out item $itemId to staff $staffId")
-            Result.success(result)
-        } catch (e: Exception) {
-            Log.e(TAG, "Error checking out item $itemId to staff $staffId: ${e.message}", e)
-            Result.failure(e)
-        }
-    }
-
-    // Check out an item with a photo
-    suspend fun checkOutItemWithPhoto(itemId: UUID, staffId: UUID, photoPath: String): Result<CheckoutLog> {
-        return try {
-            Log.d(TAG, "Checking out item $itemId to staff $staffId with photo")
-            val result = checkoutLogRepository.checkoutItem(itemId, staffId, photoPath)
-            Log.d(TAG, "Successfully checked out item $itemId to staff $staffId with photo")
-            Result.success(result)
-        } catch (e: Exception) {
-            Log.e(TAG, "Error checking out item with photo: ${e.message}", e)
-            Result.failure(e)
-        }
-    }
-
-    // Check in an item
-    suspend fun checkInItem(checkoutLog: CheckoutLog): Result<CheckoutLog> {
-        return try {
-            Log.d(TAG, "Checking in item for checkout ${checkoutLog.id}")
-            checkoutLogRepository.checkinItem(checkoutLog)
-            Log.d(TAG, "Successfully checked in item for checkout ${checkoutLog.id}")
-            Result.success(checkoutLog)
-        } catch (e: Exception) {
-            Log.e(TAG, "Error checking in item for checkout ${checkoutLog.id}: ${e.message}", e)
-            Result.failure(e)
-        }
-    }
-
-    /**
-     * Factory for creating a [CheckoutViewModel] with a constructor that takes a
-     * [CheckoutRepository] and [ItemRepository]
-     */
-    companion object {
-        fun provideFactory(
-            checkoutRepository: CheckoutLogRepository,
-            itemRepository: ItemRepository,
-            staffRepository: StaffRepository
-        ): ViewModelProvider.Factory = object : ViewModelProvider.Factory {
-            @Suppress("UNCHECKED_CAST")
-            override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                return CheckoutViewModel(checkoutRepository, itemRepository, staffRepository) as T
+        Log.d(TAG, "Getting all checkout logs")
+        return checkoutRepository.getAllCheckoutLogs()
+            .catch { e ->
+                Log.e(TAG, "Error in getAllCheckoutLogs: ${e.message}", e)
+                emit(emptyList())
             }
+    }
+
+    suspend fun getItemById(itemId: UUID): Item? {
+        return try {
+            Log.d(TAG, "Getting item by ID: $itemId")
+            val item = itemRepository.getItemById(itemId).first()
+            if (item == null) {
+                Log.w(TAG, "Item not found: $itemId")
+            }
+            item
+        } catch (e: Exception) {
+            Log.e(TAG, "Error getting item by ID: ${e.message}", e)
+            null
+        }
+    }
+
+    suspend fun getStaffById(staffId: UUID): Staff? {
+        return try {
+            Log.d(TAG, "Getting staff by ID: $staffId")
+            val staff = staffRepository.getStaffById(staffId).first()
+            if (staff == null) {
+                Log.w(TAG, "Staff not found: $staffId")
+            }
+            staff
+        } catch (e: Exception) {
+            Log.e(TAG, "Error getting staff by ID: ${e.message}", e)
+            null
         }
     }
 }

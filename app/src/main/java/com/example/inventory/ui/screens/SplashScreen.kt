@@ -36,7 +36,8 @@ import kotlinx.coroutines.delay
 
 @Composable
 fun SplashScreen(
-    onSplashComplete: () -> Unit
+    onSplashComplete: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     var startAnimation by remember { mutableStateOf(false) }
     val alphaAnim = animateFloatAsState(
@@ -45,20 +46,9 @@ fun SplashScreen(
         label = "Splash Animation"
     )
     
-    // Get application context to ensure database is initialized
-    val context = LocalContext.current
-    val application = context.applicationContext as InventoryApplication
-    
     LaunchedEffect(key1 = true) {
         startAnimation = true
-        
-        // Ensure database is initialized by accessing the container
-        val container = application.container
-        
-        // Wait for animation and initialization
         delay(2500) // 2.5 seconds delay
-        
-        // Navigate to main screen
         onSplashComplete()
     }
     

@@ -1,13 +1,12 @@
 package com.example.inventory.ui.viewmodel
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.inventory.data.model.Staff
 import com.example.inventory.data.repository.StaffRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import java.util.UUID
 import javax.inject.Inject
@@ -17,147 +16,122 @@ class StaffViewModel @Inject constructor(
     private val staffRepository: StaffRepository
 ) : ViewModel() {
 
-    // Direct access to repository - no mapping needed since we're using model objects
-    val allStaff: Flow<List<Staff>> = flow {
-        try {
-            android.util.Log.d("StaffViewModel", "Collecting staff data from repository")
-            staffRepository.getAllStaff().collect { staffList ->
-                android.util.Log.d("StaffViewModel", "Received ${staffList.size} staff members from repository")
-                emit(staffList)
-            }
-        } catch (e: Exception) {
-            android.util.Log.e("StaffViewModel", "Error collecting staff data: ${e.message}", e)
-            emit(emptyList<Staff>())
-        }
+    companion object {
+        private const val TAG = "StaffViewModel"
     }
-    
-    /**
-     * Get staff by department
-     */
-    fun getStaffByDepartment(department: String): Flow<List<Staff>> = 
-        staffRepository.getStaffByDepartment(department)
-    
-    /**
-     * Add a new staff record
-     * 
-     * [CLOUD ENDPOINT - CREATE] Creates a new staff member with name, department, and optional contact details
-     */
-    fun addStaff(staff: Staff) {
-        viewModelScope.launch {
+
+    private val _uiState = MutableStateFlow<StaffUiState>(StaffUiState.Loading)
+    val uiState: StateFlow<StaffUiState> = _uiState.asStateFlow()
+
+    // All staff
+    fun getAllStaff(): Flow<List<Staff>> {
+        return staffRepository.getAllStaff()
+    }
+
+    // Active staff
+    val activeStaff: Flow<List<Staff>> = staffRepository.getAllStaff()
+        .map { staffList -> staffList.filter { it.isActive } }
+
+    // Archived staff
+    val archivedStaff: Flow<List<Staff>> = staffRepository.getAllStaff()
+        .map { staffList -> staffList.filter { !it.isActive } }
+
+    // Staff by department
+    val staffByDepartment: Flow<Map<String, List<Staff>>> = staffRepository.getAllStaff()
+        .map { staffList -> staffList.groupBy { it.department } }
+
+    // Get staff by ID
+    fun getStaffById(id: UUID): Flow<Staff?> {
+        return staffRepository.getStaffById(id)
+    }
+
+    // Get staff by department
+    fun getStaffByDepartment(department: String): Flow<List<Staff>> {
+        return staffRepository.getAllStaff()
+            .map { staffList -> staffList.filter { it.department == department } }
+    }
+
+    // Add a new staff member
+    suspend fun addStaff(staff: Staff): Result<Staff> {
+        return try {
+            _uiState.value = StaffUiState.Loading
             staffRepository.insertStaff(staff)
+            _uiState.value = StaffUiState.Success
+            Result.success(staff)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error adding staff: ${e.message}", e)
+            _uiState.value = StaffUiState.Error("Failed to add staff: ${e.message}")
+            Result.failure(e)
         }
     }
     
-    /**
-     * Update an existing staff record
-     * 
-     * [CLOUD ENDPOINT - UPDATE] Modifies all properties of an existing staff record
-     */
-    fun updateStaff(staff: Staff) {
-        viewModelScope.launch {
+    // Update an existing staff member
+    suspend fun updateStaff(staff: Staff): Result<Staff> {
+        return try {
+            _uiState.value = StaffUiState.Loading
             staffRepository.updateStaff(staff)
+            _uiState.value = StaffUiState.Success
+            Result.success(staff)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error updating staff: ${e.message}", e)
+            _uiState.value = StaffUiState.Error("Failed to update staff: ${e.message}")
+            Result.failure(e)
         }
     }
     
-    /**
-     * Delete a staff record
-     * 
-     * [CLOUD ENDPOINT - DELETE] Permanently removes a staff record from the database
-     */
-    fun deleteStaff(staff: Staff) {
-        viewModelScope.launch {
+    // Delete a staff member
+    suspend fun deleteStaff(staff: Staff): Result<Unit> {
+        return try {
+            _uiState.value = StaffUiState.Loading
             staffRepository.deleteStaff(staff)
+            _uiState.value = StaffUiState.Success
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error deleting staff: ${e.message}", e)
+            _uiState.value = StaffUiState.Error("Failed to delete staff: ${e.message}")
+            Result.failure(e)
         }
     }
     
-    /**
-     * Archive a staff member (mark as inactive) instead of deleting
-     * 
-     * [CLOUD ENDPOINT - UPDATE] Soft-delete by setting isActive=false on a staff record
-     */
-    fun archiveStaff(staff: Staff) {
-        viewModelScope.launch {
-            val updatedStaff = staff.copy(
+    // Archive a staff member
+    suspend fun archiveStaff(staff: Staff): Result<Staff> {
+        return try {
+            _uiState.value = StaffUiState.Loading
+            val archivedStaff = staff.copy(
                 isActive = false,
                 lastModified = System.currentTimeMillis()
             )
-            staffRepository.updateStaff(updatedStaff)
+            staffRepository.updateStaff(archivedStaff)
+            _uiState.value = StaffUiState.Success
+            Result.success(archivedStaff)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error archiving staff: ${e.message}", e)
+            _uiState.value = StaffUiState.Error("Failed to archive staff: ${e.message}")
+            Result.failure(e)
         }
     }
     
-    /**
-     * Restore an archived staff member
-     */
-    fun restoreStaff(staff: Staff) {
-        viewModelScope.launch {
-            val updatedStaff = staff.copy(
+    // Unarchive a staff member
+    suspend fun unarchiveStaff(staff: Staff): Result<Staff> {
+        return try {
+            _uiState.value = StaffUiState.Loading
+            val unarchivedStaff = staff.copy(
                 isActive = true,
                 lastModified = System.currentTimeMillis()
             )
-            staffRepository.updateStaff(updatedStaff)
+            staffRepository.updateStaff(unarchivedStaff)
+            _uiState.value = StaffUiState.Success
+            Result.success(unarchivedStaff)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error unarchiving staff: ${e.message}", e)
+            _uiState.value = StaffUiState.Error("Failed to unarchive staff: ${e.message}")
+            Result.failure(e)
         }
     }
-    
-    /**
-     * Unarchive a staff member (same as restore)
-     */
-    fun unarchiveStaff(staff: Staff) {
-        viewModelScope.launch {
-            val updatedStaff = staff.copy(
-                isActive = true,
-                lastModified = System.currentTimeMillis()
-            )
-            staffRepository.updateStaff(updatedStaff)
-        }
-    }
-    
-    /**
-     * Get staff by ID
-     */
-    fun getStaffById(id: UUID): Flow<Staff?> = flow {
-        val staff = staffRepository.getStaffById(id)
-        emit(staff)
-    }
-    
-    /**
-     * Get staff by ID (suspend function for direct access)
-     */
-    suspend fun getStaffByIdSuspend(id: UUID): Staff? = staffRepository.getStaffById(id)
-    
-    /**
-     * Update staff department
-     * 
-     * [CLOUD ENDPOINT - UPDATE] Changes only the department field of a staff record
-     */
-    fun updateStaffDepartment(staff: Staff, newDepartment: String) {
-        val updatedStaff = staff.copy(department = newDepartment)
-        viewModelScope.launch {
-            staffRepository.updateStaff(updatedStaff)
-        }
-    }
-    
-    /**
-     * Update staff contact information
-     */
-    fun updateStaffContact(staff: Staff, phone: String, email: String) {
-        val updatedStaff = staff.copy(phone = phone, email = email)
-        viewModelScope.launch {
-            staffRepository.updateStaff(updatedStaff)
-        }
-    }
-    
-    /**
-     * Factory for creating StaffViewModel instances with dependencies
-     */
-    companion object {
-        class Factory(private val staffRepository: StaffRepository) : ViewModelProvider.Factory {
-            @Suppress("UNCHECKED_CAST")
-            override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                if (modelClass.isAssignableFrom(StaffViewModel::class.java)) {
-                    return StaffViewModel(staffRepository) as T
-                }
-                throw IllegalArgumentException("Unknown ViewModel class")
-            }
-        }
-    }
+}
+
+sealed class StaffUiState {
+    object Loading : StaffUiState()
+    object Success : StaffUiState()
+    data class Error(val message: String) : StaffUiState()
 } 
